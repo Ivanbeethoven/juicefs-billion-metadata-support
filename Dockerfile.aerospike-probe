@@ -1,0 +1,14 @@
+FROM debian:trixie-slim
+
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends ca-certificates fio fuse3 procps && \
+    rm -rf /var/lib/apt/lists/*
+
+COPY juicefs /usr/local/bin/juicefs
+
+RUN chmod +x /usr/local/bin/juicefs && \
+    mkdir -p /artifacts /mnt && \
+    grep -q '^user_allow_other$' /etc/fuse.conf 2>/dev/null || \
+      echo 'user_allow_other' >> /etc/fuse.conf
+
+ENTRYPOINT ["/bin/sh", "-ec"]
