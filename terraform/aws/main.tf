@@ -146,3 +146,82 @@ resource "aws_instance" "tikv" {
   })
 }
 
+resource "aws_security_group" "aerospike" {
+  name        = "${local.cluster_name}-aerospike-sg"
+  description = "JuiceFS experimental Aerospike metadata cluster"
+  vpc_id      = var.vpc_id
+
+  ingress {
+    description = "SSH"
+    from_port   = 22
+    to_port     = 22
+    protocol    = "tcp"
+    cidr_blocks = var.ssh_cidr_blocks
+  }
+
+  ingress {
+    description = "Aerospike client"
+    from_port   = 3000
+    to_port     = 3000
+    protocol    = "tcp"
+    cidr_blocks = var.metadata_client_cidr_blocks
+  }
+
+  ingress {
+    description = "Aerospike mesh/fabric/heartbeat/info"
+    from_port   = 3001
+    to_port     = 3003
+    protocol    = "tcp"
+    self        = true
+  }
+
+  ingress {
+    description = "Node exporter"
+    from_port   = 9100
+    to_port     = 9100
+    protocol    = "tcp"
+    self        = true
+  }
+
+  ingress {
+    description = "Aerospike exporter"
+    from_port   = 9145
+    to_port     = 9145
+    protocol    = "tcp"
+    self        = true
+  }
+
+  egress {
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  tags = merge(local.common_tags, {
+    Name = "${local.cluster_name}-aerospike-sg"
+  })
+}
+
+resource "aws_instance" "aerospike" {
+  count         = var.aerospike_count
+  ami           = data.aws_ami.ubuntu.id
+  instance_type = var.aerospike_instance_type
+  subnet_id     = var.subnet_ids[count.index % local.az_count]
+  key_name      = var.key_name
+
+  vpc_security_group_ids = [aws_security_group.aerospike.id]
+
+  root_block_device {
+    volume_type = "gp3"
+    volume_size = var.root_volume_size_gb
+    iops        = var.root_volume_iops
+    throughput  = var.root_volume_throughput
+  }
+
+  tags = merge(local.common_tags, {
+    Name = "${local.cluster_name}-aerospike-${count.index + 1}"
+    Role = "aerospike"
+    Zone = tostring(count.index % local.az_count)
+  })
+}

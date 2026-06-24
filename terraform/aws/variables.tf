@@ -43,6 +43,12 @@ variable "tikv_count" {
   default     = 24
 }
 
+variable "aerospike_count" {
+  description = "Optional Aerospike node count for the experimental metadata path. Set to 0 to disable."
+  type        = number
+  default     = 0
+}
+
 variable "pd_instance_type" {
   description = "PD EC2 instance type."
   type        = string
@@ -53,6 +59,18 @@ variable "tikv_instance_type" {
   description = "TiKV EC2 instance type."
   type        = string
   default     = "i4i.8xlarge"
+}
+
+variable "aerospike_instance_type" {
+  description = "Aerospike EC2 instance type."
+  type        = string
+  default     = "i4i.8xlarge"
+}
+
+variable "metadata_client_cidr_blocks" {
+  description = "CIDR blocks allowed to reach metadata engine client ports."
+  type        = list(string)
+  default     = ["10.0.0.0/8"]
 }
 
 variable "root_volume_size_gb" {
@@ -78,4 +96,3 @@ variable "tags" {
   type        = map(string)
   default     = {}
 }
-

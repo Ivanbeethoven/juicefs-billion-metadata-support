@@ -20,6 +20,13 @@
 - TiKV prerequisites  
   https://tikv.org/docs/6.1/deploy/install/prerequisites/
 
+## Aerospike
+
+- Capacity planning guide: https://aerospike.com/docs/database/manage/planning/capacity/
+- System limits and thresholds: https://aerospike.com/docs/database/reference/limitations/
+- Primary index architecture: https://aerospike.com/docs/database/learn/architecture/data-storage/primary-index/
+- Secondary index capacity planning: https://aerospike.com/docs/database/manage/planning/capacity/secondary-indexes/
+
 ## RustFS
 
 - RustFS Documentation  

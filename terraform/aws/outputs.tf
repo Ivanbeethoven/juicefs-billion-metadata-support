@@ -13,3 +13,12 @@ output "juicefs_meta_url" {
   value       = "tikv://${join(",", [for ip in aws_instance.pd[*].private_ip : "${ip}:2379"])}/juicefs-prod"
 }
 
+output "aerospike_private_ips" {
+  description = "Private IPs of optional Aerospike nodes."
+  value       = aws_instance.aerospike[*].private_ip
+}
+
+output "juicefs_aerospike_meta_url" {
+  description = "Experimental JuiceFS Aerospike metadata URL shape."
+  value       = var.aerospike_count > 0 ? "aerospike://${join(",", [for ip in aws_instance.aerospike[*].private_ip : "${ip}:3000"])}/juicefs-prod?set=metadata" : null
+}

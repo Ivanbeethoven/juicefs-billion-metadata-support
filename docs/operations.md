@@ -67,6 +67,36 @@ juicefs format \
   juicefs-prod
 ```
 
+## 5a. Aerospike 候选初始化
+
+Aerospike 路线需要使用带 Aerospike metadata driver 的 JuiceFS 构建。生产化之前，先确认 driver 已经通过随机元数据测试、crash/retry 测试、`juicefs fsck`、`mdtest` 和长时间 fio。
+
+示例 metadata URL：
+
+```bash
+export META_URL="aerospike://as1:3000,as2:3000,as3:3000/juicefs?set=metadata"
+```
+
+格式化：
+
+```bash
+juicefs format \
+  --storage s3 \
+  --bucket "${RUSTFS_ENDPOINT}/${RUSTFS_BUCKET}" \
+  --access-key "$RUSTFS_ACCESS_KEY" \
+  --secret-key "$RUSTFS_SECRET_KEY" \
+  "$META_URL" \
+  juicefs-prod
+```
+
+上线前必须验证：
+
+- 没有 metadata 路径依赖全 namespace scan。
+- 大目录 `readdir` 可分页、可限速。
+- `rename`、`unlink`、`mkdir`、`rmdir` 在并发和 crash 后可恢复。
+- Aerospike primary index、secondary index、namespace data 使用率都有明确水位。
+- 节点重启和 rolling upgrade 满足业务 SLO。
+
 ## 6. 压测建议
 
 上线前至少覆盖：
@@ -75,6 +105,7 @@ juicefs format \
 - 小文件创建、删除、rename、list。
 - 并发客户端挂载。
 - TiKV 磁盘水位、RocksDB compaction、Raft store 指标观察。
+- Aerospike primary index、secondary index、namespace stop-writes 水位观察。
 - JuiceFS metadata latency 观察。
 - RustFS 请求延迟、错误率、bucket 容量和节点健康观察。
 

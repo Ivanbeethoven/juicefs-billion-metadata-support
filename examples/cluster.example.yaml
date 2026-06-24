@@ -1,6 +1,7 @@
 cluster_name: juicefs-tikv-meta-prod
 pd_count: 3
 tikv_count: 24
+aerospike_count: 0
 azs:
   - az-a
   - az-b
@@ -11,6 +12,14 @@ capacity:
   replicas: 3
   headroom: 2.2
   usable_ssd_tib_per_tikv: 3
+aerospike_capacity:
+  enabled: false
+  records_per_file: 4
+  replication_factor: 2
+  record_bytes: 512
+  secondary_indexes: 1
+  ram_gib_per_node_for_indexes: 192
+  usable_ssd_tib_per_node: 3
 juicefs:
   name: juicefs-prod
   storage: s3
@@ -19,3 +28,5 @@ juicefs:
   bucket: juicefs-prod
   access_key_env: RUSTFS_ACCESS_KEY
   secret_key_env: RUSTFS_SECRET_KEY
+  tikv_meta_url: tikv://pd1:2379,pd2:2379,pd3:2379/juicefs-prod
+  aerospike_meta_url: aerospike://as1:3000,as2:3000,as3:3000/juicefs-prod?set=metadata
