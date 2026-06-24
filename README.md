@@ -99,11 +99,29 @@ python scripts/capacity_calculator.py \
 
 注意：Aerospike 数据库可以支撑百亿级 records，但 JuiceFS metadata 不是纯点查 KV。生产化必须先解决目录分页、prefix/range scan、多 key 一致性、rename/unlink 原子性和 crash recovery。详见 [Aerospike metadata option](docs/aerospike.md)。
 
+本仓库已经包含一个可构建的 JuiceFS Aerospike metadata fork，位于 [`juicefs-aerospike-metadata/`](juicefs-aerospike-metadata/)。该版本在 JuiceFS 的 transactional KV metadata 层增加了 Aerospike driver，并保留了用于 smoke test 的 [`Dockerfile.aerospike-probe`](juicefs-aerospike-metadata/Dockerfile.aerospike-probe) 和设计说明 [`AEROSPIKE_METADATA.md`](juicefs-aerospike-metadata/AEROSPIKE_METADATA.md)。当前定位是 PoC/验证版本，适合用来跑功能、fio 和 metadata benchmark，不建议直接作为生产元数据引擎上线。
+
+快速构建入口：
+
+```bash
+cd juicefs-aerospike-metadata
+go test ./pkg/meta -run TestKVClient -count=1
+make juicefs
+```
+
+Aerospike metadata URL 形式：
+
+```text
+aerospike://host1:3000,host2:3000/namespace[/path-prefix]
+```
+
 ## 仓库内容
 
 ```text
 docs/                 架构、运维、参考资料
 examples/             集群配置示例
+juicefs-aerospike-metadata/
+                      可构建的 JuiceFS Aerospike metadata PoC fork
 scripts/              容量估算、TiUP topology 生成
 terraform/aws/        AWS 机器和安全组骨架
 tiup/                 TiUP topology 示例
@@ -215,6 +233,8 @@ juicefs mount -d \
 
 - [架构说明](docs/architecture.md)
 - [Aerospike metadata option](docs/aerospike.md)
+- [JuiceFS Aerospike metadata fork](juicefs-aerospike-metadata/)
+- [Aerospike driver notes](juicefs-aerospike-metadata/AEROSPIKE_METADATA.md)
 - [运维 Runbook](docs/operations.md)
 - [参考资料](docs/references.md)
 - [TiUP topology 示例](tiup/topology.example.yaml)
