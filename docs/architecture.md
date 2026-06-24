@@ -2,7 +2,7 @@
 
 ## 目标
 
-目标是支撑 100 亿文件数量级的 JuiceFS metadata。数据仍放在对象存储，元数据使用 TiKV 集群承载。
+目标是支撑 100 亿文件数量级的 JuiceFS metadata。数据放在 RustFS，元数据使用 TiKV 集群承载。
 
 ## 推荐拓扑
 
@@ -53,4 +53,3 @@ ceil(files * metadata_kib / 1024 / 1024 / 1024 * replicas * headroom / usable_ss
 ```
 
 建议把 `headroom` 取 `1.8-2.5`。对百亿文件生产环境，低于 18 个 TiKV 节点通常风险较高。
-

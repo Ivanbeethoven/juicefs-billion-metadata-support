@@ -40,17 +40,34 @@ tiup cluster start juicefs-tikv-meta
 tiup cluster display juicefs-tikv-meta
 ```
 
-## 4. 初始化 JuiceFS
+## 4. 准备 RustFS 后端
+
+为 JuiceFS 创建独立 RustFS bucket，并准备内网 endpoint 和专用访问密钥：
 
 ```bash
+export RUSTFS_ENDPOINT="http://rustfs.example.internal:9000"
+export RUSTFS_BUCKET="juicefs-prod"
+export RUSTFS_ACCESS_KEY="replace-with-access-key"
+export RUSTFS_SECRET_KEY="replace-with-secret-key"
+```
+
+RustFS 通过 S3 API 对接 JuiceFS，所以 JuiceFS `format` 仍使用 `--storage s3`。
+
+## 5. 初始化 JuiceFS
+
+```bash
+export META_URL="tikv://pd1:2379,pd2:2379,pd3:2379/juicefs-prod"
+
 juicefs format \
   --storage s3 \
-  --bucket https://your-bucket.s3.amazonaws.com \
-  "tikv://pd1:2379,pd2:2379,pd3:2379/juicefs-prod" \
+  --bucket "${RUSTFS_ENDPOINT}/${RUSTFS_BUCKET}" \
+  --access-key "$RUSTFS_ACCESS_KEY" \
+  --secret-key "$RUSTFS_SECRET_KEY" \
+  "$META_URL" \
   juicefs-prod
 ```
 
-## 5. 压测建议
+## 6. 压测建议
 
 上线前至少覆盖：
 
@@ -59,8 +76,9 @@ juicefs format \
 - 并发客户端挂载。
 - TiKV 磁盘水位、RocksDB compaction、Raft store 指标观察。
 - JuiceFS metadata latency 观察。
+- RustFS 请求延迟、错误率、bucket 容量和节点健康观察。
 
-## 6. 扩容原则
+## 7. 扩容原则
 
 容量接近水位前提前扩容，不要等磁盘逼近满盘。建议在以下条件触发扩容评估：
 
@@ -68,4 +86,4 @@ juicefs format \
 - metadata latency 长期高于业务目标。
 - compaction backlog 长期堆积。
 - 预计文件数或目录项数量进入下一个台阶。
-
+- RustFS bucket 容量或请求延迟接近业务 SLO。

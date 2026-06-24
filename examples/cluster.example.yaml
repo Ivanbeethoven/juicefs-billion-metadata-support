@@ -14,5 +14,8 @@ capacity:
 juicefs:
   name: juicefs-prod
   storage: s3
-  bucket: https://your-bucket.s3.amazonaws.com
-
+  object_backend: rustfs
+  rustfs_endpoint: http://rustfs.example.internal:9000
+  bucket: juicefs-prod
+  access_key_env: RUSTFS_ACCESS_KEY
+  secret_key_env: RUSTFS_SECRET_KEY

@@ -11,7 +11,7 @@ Dedicated TiKV cluster: 3/5 PD + 18-48 TiKV
         |
         | file chunks / objects
         v
-S3-compatible object storage
+RustFS object storage
 ```
 
 核心判断：百亿级 JuiceFS 元数据不要按 3 台、5 台小集群设计。以 100 亿文件为目标时，推荐从 **3 PD + 24 TiKV** 起步；如果目录操作高并发、单文件元数据偏大或需要更高余量，按 **5 PD + 36 TiKV** 或更高规模设计。
@@ -21,13 +21,13 @@ S3-compatible object storage
 本方案适合：
 
 - 文件数量目标在 `10B` 量级，目录树、rename、list、stat、create、delete 等 metadata 操作压力显著。
-- 数据块存储在 S3、MinIO、OSS、COS、OBS 等对象存储，TiKV 只承载 JuiceFS metadata。
+- 数据块存储在 RustFS，TiKV 只承载 JuiceFS metadata。
 - 需要多客户端挂载、Kubernetes CSI、Hadoop/Spark 或大规模离线任务共享同一个文件系统。
 - 能接受先压测、再上线、再按水位滚动扩容的生产节奏。
 
 本方案不建议：
 
-- 把同一个 TiKV 集群同时作为 JuiceFS metadata 和 object storage。
+- 把同一个 TiKV 集群同时作为 JuiceFS metadata 和 RustFS 后端存储。
 - 在百亿级生产环境使用临时单机元数据引擎。
 - 未经压测就直接把历史海量小文件导入生产集群。
 
@@ -47,7 +47,7 @@ TiKV: 24
 TiKV usable SSD: 2.8-3.2 TiB/node
 Replication: 3
 Failure domains: 3 AZs or 3 independent racks
-Object storage: dedicated bucket, versioning/lifecycle policy reviewed
+RustFS: dedicated bucket, lifecycle policy reviewed
 ```
 
 如果平均每文件逻辑元数据接近 `2 KiB`，或者业务有密集 `list/stat/rename`，建议直接评估 `30-40` 个 TiKV 节点。
@@ -106,10 +106,11 @@ python scripts/capacity_calculator.py --files 10000000000 --metadata-kib 2 --usa
 
 ### 数据层
 
-- 使用对象存储作为 JuiceFS data storage。
-- 建议为生产文件系统创建独立 bucket。
-- bucket 的跨区复制、版本控制、生命周期、加密和审计策略要独立评审。
-- 不建议使用同一个 TiKV 集群同时承载 metadata 和 object data。
+- 使用 RustFS 作为 JuiceFS data storage。
+- RustFS 通过 S3 API 对接 JuiceFS，因此 JuiceFS `format` 时 `--storage` 仍使用 `s3`。
+- 建议为生产文件系统创建独立 RustFS bucket，例如 `juicefs-prod`。
+- RustFS bucket 的副本/纠删码、生命周期、TLS、访问密钥、审计和容量策略要独立评审。
+- 不建议使用同一个 TiKV 集群同时承载 metadata 和 RustFS object data。
 
 ### 客户端层
 
@@ -153,7 +154,7 @@ python scripts/capacity_calculator.py --files 10000000000 --metadata-kib 2 --usa
 | 平均元数据 | 1-2 KiB/file | 小文件、xattr、ACL、目录深度是否偏高 |
 | metadata QPS | 压测决定 | create/delete/list/stat/rename 占比 |
 | 故障域 | 3 AZ | AZ 间延迟和带宽是否满足 Raft |
-| 对象存储 | S3-compatible | 延迟、吞吐、费用、生命周期 |
+| RustFS | RustFS 集群 | 延迟、吞吐、容量、生命周期 |
 | 客户端规模 | 业务决定 | CSI/FUSE/Hadoop 是否同时使用 |
 
 ### 1. 创建基础设施
@@ -183,9 +184,28 @@ terraform output -json > ../../examples/terraform-output.json
 - subnet 必须覆盖 3 个 AZ。
 - SSH 入站不能开放到公网。
 - TiKV/PD 端口只允许集群内部和管理网络访问。
-- 对象存储访问建议走私网 endpoint。
+- RustFS 访问建议走内网 endpoint。
 
-### 2. OS 和磁盘准备
+### 2. RustFS 后端准备
+
+为 JuiceFS 创建独立 RustFS bucket 和访问密钥：
+
+```text
+RustFS endpoint: http://rustfs.example.internal:9000
+RustFS bucket: juicefs-prod
+Access key: use a dedicated JuiceFS service account
+Secret key: store in a secret manager or deployment system
+```
+
+RustFS 规划原则：
+
+- RustFS 集群与 TiKV 集群分开部署，避免元数据层和数据层互相争抢磁盘、CPU 和网络。
+- RustFS bucket 专用于一个 JuiceFS 文件系统，不与其他业务混用。
+- RustFS endpoint 优先使用内网域名，生产建议启用 TLS。
+- RustFS 容量按 JuiceFS 数据块、对象副本/纠删码、生命周期和增长率单独估算。
+- RustFS 监控要覆盖磁盘水位、对象请求延迟、错误率、节点健康和后台修复/重平衡状态。
+
+### 3. OS 和磁盘准备
 
 每台 TiKV 节点建议：
 
@@ -212,7 +232,7 @@ fio --filename=/data/fio-test --rw=randwrite --bs=16k --iodepth=64 --runtime=60 
 - 检查磁盘调度、文件系统和挂载参数。
 - 保证节点间低延迟和稳定带宽。
 
-### 3. 生成 TiUP topology
+### 4. 生成 TiUP topology
 
 Terraform 输出 IP 后生成 TiUP topology：
 
@@ -242,7 +262,7 @@ server_configs:
     raftstore.capacity: 3TiB
 ```
 
-### 4. 部署 TiKV
+### 5. 部署 TiKV
 
 示例：
 
@@ -259,7 +279,7 @@ tiup cluster check juicefs-tikv-meta
 - 先在压测环境验证 TiKV、JuiceFS client、CSI/Hadoop SDK 的组合版本。
 - 升级要先演练 rolling upgrade 和 rollback。
 
-### 5. 初始化 JuiceFS 文件系统
+### 6. 初始化 JuiceFS 文件系统
 
 TiKV metadata URL 格式：
 
@@ -271,17 +291,25 @@ tikv://<pd_addr>[,<pd_addr>...]/<prefix>
 
 ```bash
 export META_URL="tikv://pd1:2379,pd2:2379,pd3:2379/juicefs-prod"
+export RUSTFS_ENDPOINT="http://rustfs.example.internal:9000"
+export RUSTFS_BUCKET="juicefs-prod"
+export RUSTFS_ACCESS_KEY="replace-with-access-key"
+export RUSTFS_SECRET_KEY="replace-with-secret-key"
 
 juicefs format \
   --storage s3 \
-  --bucket https://your-bucket.s3.amazonaws.com \
+  --bucket "${RUSTFS_ENDPOINT}/${RUSTFS_BUCKET}" \
+  --access-key "$RUSTFS_ACCESS_KEY" \
+  --secret-key "$RUSTFS_SECRET_KEY" \
   "$META_URL" \
   juicefs-prod
 ```
 
+说明：这里的 `--storage s3` 表示使用 S3 API 协议；实际后端是 RustFS。
+
 如果 TiKV/PD 启用 TLS，metadata URL 需要追加证书参数，证书路径建议使用绝对路径。
 
-### 6. 挂载和客户端配置
+### 7. 挂载和客户端配置
 
 Linux FUSE 示例：
 
@@ -302,7 +330,7 @@ juicefs mount -d \
 - 生产不要让所有客户端同时重启或同时冷启动 cache。
 - 对 metadata 敏感业务，单独监控 mount 端 metadata latency。
 
-### 7. 压测
+### 8. 压测
 
 上线前至少做三类压测。
 
@@ -326,7 +354,7 @@ juicefs bench /mnt/juicefs-prod -p 16
 
 也可以使用 mdtest 或业务自有小文件压测脚本。
 
-#### 对象存储压测
+#### RustFS 压测
 
 覆盖：
 
@@ -335,7 +363,7 @@ juicefs bench /mnt/juicefs-prod -p 16
 - 混合读写
 - 跨 AZ 客户端访问
 
-对象存储瓶颈会直接影响 JuiceFS 数据面吞吐，但不等同于 metadata QPS。
+RustFS 瓶颈会直接影响 JuiceFS 数据面吞吐，但不等同于 metadata QPS。
 
 #### 故障演练
 
@@ -345,9 +373,11 @@ juicefs bench /mnt/juicefs-prod -p 16
 - 单 PD 节点宕机。
 - 单 AZ 故障。
 - TiKV 扩容一个批次。
+- RustFS 单节点故障。
+- RustFS 磁盘故障和修复流程。
 - 客户端重启和重新挂载。
 
-### 8. 监控
+### 9. 监控
 
 必须监控：
 
@@ -358,7 +388,7 @@ juicefs bench /mnt/juicefs-prod -p 16
 | TiKV | raftstore, apply, scheduler, RocksDB compaction, write stall |
 | Disk | latency, utilization, available space, IO queue |
 | Network | bandwidth, packet loss, cross-AZ latency |
-| Object storage | request latency, error rate, throttling, 4xx/5xx |
+| RustFS | request latency, error rate, bucket capacity, node health, repair/rebalance |
 
 建议告警：
 
@@ -368,7 +398,7 @@ juicefs bench /mnt/juicefs-prod -p 16
 - PD scheduling 长时间异常。
 - 任一故障域内 TiKV 节点数低于设计下限。
 
-### 9. 备份和恢复
+### 10. 备份和恢复
 
 JuiceFS 提供 `dump/load` 导出和恢复元数据：
 
@@ -382,10 +412,10 @@ juicefs load "$META_URL" meta-dump.json.gz
 - `juicefs dump` 不提供快照一致性；如果导出期间有写入，备份可能包含不同时间点的元数据。
 - 大规模文件系统直接在线 dump 可能影响系统稳定性，要谨慎使用。
 - 高一致性要求场景应暂停写入或在隔离窗口执行。
-- TiKV 层备份、对象存储版本控制、JuiceFS dump 应组合设计，而不是只依赖单一手段。
-- 恢复演练必须包含 metadata 和 object storage 的一致性校验。
+- TiKV 层备份、RustFS 数据保护、JuiceFS dump 应组合设计，而不是只依赖单一手段。
+- 恢复演练必须包含 metadata 和 RustFS object data 的一致性校验。
 
-### 10. 扩容
+### 11. 扩容
 
 触发扩容评估：
 
@@ -394,6 +424,7 @@ juicefs load "$META_URL" meta-dump.json.gz
 - metadata latency 长期接近 SLO 上限。
 - compaction 或 write stall 频繁。
 - 业务新增大量小文件或目录遍历任务。
+- RustFS bucket 容量或请求延迟接近 SLO 上限。
 
 扩容原则：
 
@@ -401,6 +432,7 @@ juicefs load "$META_URL" meta-dump.json.gz
 - 扩容后观察 region 调度、磁盘水位和 latency，再进入下一批。
 - 不要在业务高峰同时做大规模导入和 TiKV 扩容。
 - 扩容后更新 topology、inventory、监控分组和容量模型。
+- RustFS 扩容和 TiKV 扩容分批执行，避免数据面和元数据面同时扰动。
 
 ## 生产上线检查清单
 
@@ -410,8 +442,8 @@ juicefs load "$META_URL" meta-dump.json.gz
 - [ ] TiKV 生产起步不少于 18 个节点，推荐 24 个节点起步。
 - [ ] TiKV 节点均匀分布到 3 个故障域。
 - [ ] TiKV 数据盘按安全可用容量估算，不按标称容量估算。
-- [ ] 对象存储 bucket 独立，权限、加密、生命周期策略已评审。
-- [ ] 管理网络、业务网络、对象存储 endpoint 路径已确认。
+- [ ] RustFS bucket 独立，权限、TLS、生命周期、数据保护策略已评审。
+- [ ] 管理网络、业务网络、RustFS endpoint 路径已确认。
 
 ### TiKV
 
@@ -424,6 +456,7 @@ juicefs load "$META_URL" meta-dump.json.gz
 ### JuiceFS
 
 - [ ] `format` 参数已评审并记录。
+- [ ] `--storage s3` 明确用于 RustFS S3 API，不代表 AWS S3。
 - [ ] metadata prefix 唯一且命名清晰。
 - [ ] mount 参数、cache 目录、cache 大小已标准化。
 - [ ] CSI/Hadoop/FUSE 客户端版本已固定。
@@ -446,7 +479,8 @@ juicefs load "$META_URL" meta-dump.json.gz
 | 单大目录过多 | list/stat 延迟异常 | 业务侧做目录分片 |
 | 在线 dump 大集群 | 影响元数据服务稳定性 | 维护窗口、限速、数据库层备份组合 |
 | 客户端同时冷启动 | metadata 突刺 | 分批启动、预热 cache |
-| 对象存储跨区访问 | 数据面延迟高、费用高 | 使用同区 bucket 和私网 endpoint |
+| RustFS 跨区访问 | 数据面延迟高、故障域复杂 | RustFS 与客户端尽量同地域/同内网 |
+| RustFS 和 TiKV 混部 | 数据面和元数据面互相干扰 | RustFS、TiKV 分离部署 |
 
 ## 本仓库如何使用
 
@@ -455,9 +489,10 @@ juicefs load "$META_URL" meta-dump.json.gz
 3. 用 `scripts/generate_tiup_topology.py` 生成 TiUP topology。
 4. 人工审查 topology 中的故障域 label 和容量参数。
 5. 用 TiUP 部署 TiKV。
-6. 用 JuiceFS `format` 初始化文件系统。
-7. 执行压测、故障演练、监控接入。
-8. 按上线清单完成生产准入。
+6. 准备 RustFS bucket、endpoint 和专用访问密钥。
+7. 用 JuiceFS `format` 初始化文件系统。
+8. 执行压测、故障演练、监控接入。
+9. 按上线清单完成生产准入。
 
 ## 参考资料
 
@@ -467,4 +502,5 @@ juicefs load "$META_URL" meta-dump.json.gz
 - [JuiceFS: Command Reference](https://juicefs.com/docs/community/command_reference/)
 - [JuiceFS: Architecture](https://juicefs.com/docs/community/architecture/)
 - [TiDB: Hardware and Software Requirements](https://docs.pingcap.com/tidb/stable/hardware-and-software-requirements)
-
+- [RustFS Documentation](https://docs.rustfs.com/)
+- [RustFS: Amazon S3 Compatibility](https://docs.rustfs.com/features/s3-compatibility/)

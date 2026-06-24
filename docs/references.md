@@ -20,3 +20,9 @@
 - TiKV prerequisites  
   https://tikv.org/docs/6.1/deploy/install/prerequisites/
 
+## RustFS
+
+- RustFS Documentation  
+  https://docs.rustfs.com/
+- RustFS Amazon S3 Compatibility  
+  https://docs.rustfs.com/features/s3-compatibility/
