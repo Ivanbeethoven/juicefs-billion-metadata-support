@@ -1,0 +1,10 @@
+.terraform/
+*.tfstate
+*.tfstate.*
+terraform.tfvars
+terraform-output.json
+topology.generated.yaml
+__pycache__/
+*.pyc
+.DS_Store
+

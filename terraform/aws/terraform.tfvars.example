@@ -1,0 +1,19 @@
+region       = "us-east-1"
+cluster_name = "juicefs-tikv-meta-prod"
+vpc_id       = "vpc-xxxxxxxx"
+subnet_ids   = ["subnet-aaaaaaaa", "subnet-bbbbbbbb", "subnet-cccccccc"]
+key_name     = "your-key-pair"
+
+pd_count   = 3
+tikv_count = 24
+
+pd_instance_type   = "m7i.xlarge"
+tikv_instance_type = "i4i.8xlarge"
+
+ssh_cidr_blocks = ["10.0.0.0/8"]
+
+tags = {
+  Owner = "storage-platform"
+  Env   = "prod"
+}
+

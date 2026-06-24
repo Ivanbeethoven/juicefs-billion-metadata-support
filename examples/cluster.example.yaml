@@ -1,0 +1,18 @@
+cluster_name: juicefs-tikv-meta-prod
+pd_count: 3
+tikv_count: 24
+azs:
+  - az-a
+  - az-b
+  - az-c
+capacity:
+  files: 10000000000
+  metadata_kib_per_file: 1
+  replicas: 3
+  headroom: 2.2
+  usable_ssd_tib_per_tikv: 3
+juicefs:
+  name: juicefs-prod
+  storage: s3
+  bucket: https://your-bucket.s3.amazonaws.com
+
