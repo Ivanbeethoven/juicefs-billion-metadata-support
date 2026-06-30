@@ -24,6 +24,7 @@ docs/
 examples/
   juicefs-3tikv.env.example
 scripts/
+  aws_full_deploy.sh               AWS 全自动部署总控脚本
   generate_aws_tfvars.sh           生成 terraform.tfvars 和随机密钥
   install_tiup_binary.sh           安装 TiUP/TiKV 二进制包
   deploy_3tikv_cluster.sh          部署 3 PD + 3 TiKV
@@ -43,9 +44,19 @@ tiup/
 完整逐步部署说明见 [AWS deployment steps](docs/aws-deployment-steps.md)。
 
 ```bash
-scripts/generate_aws_tfvars.sh
-terraform -chdir=terraform/aws init
-terraform -chdir=terraform/aws apply
+scripts/aws_full_deploy.sh deploy
+```
+
+这个命令会自动生成 `terraform.tfvars`、执行 Terraform、等待节点初始化、部署 TiKV，并初始化 JuiceFS。metadata test 默认不会自动启动，需要确认资源规格和成本后执行：
+
+```bash
+scripts/aws_full_deploy.sh test
+```
+
+如果要部署后立刻跑 metadata test：
+
+```bash
+RUN_METADATA_TEST=1 scripts/aws_full_deploy.sh deploy
 ```
 
 Terraform 会生成：

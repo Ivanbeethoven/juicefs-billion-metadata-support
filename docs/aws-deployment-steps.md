@@ -22,7 +22,15 @@
 
 ## 2. 配置 Terraform
 
-推荐用脚本生成本地配置：
+最省事的入口是全自动部署脚本：
+
+```bash
+scripts/aws_full_deploy.sh deploy
+```
+
+它会自动生成 `terraform.tfvars`、执行 `terraform init/apply`、等待 4 台节点初始化、部署 `3 PD + 3 TiKV`，并初始化 JuiceFS。
+
+如果希望先只生成配置再检查，使用：
 
 ```bash
 scripts/generate_aws_tfvars.sh
@@ -104,7 +112,7 @@ test_threads = 256
 
 ## 3. 创建 AWS 资源
 
-执行 Terraform：
+如果没有使用 `scripts/aws_full_deploy.sh deploy`，可以手动执行 Terraform：
 
 ```bash
 terraform -chdir=terraform/aws init
@@ -144,7 +152,7 @@ set +a
 
 ## 5. 部署 TiKV 并初始化 JuiceFS
 
-运行自动部署脚本：
+如果没有使用总控脚本，运行部署脚本：
 
 ```bash
 scripts/run_aws_deploy.sh
@@ -167,6 +175,12 @@ scripts/wait_aws_nodes.sh
 ## 6. 运行亿级小文件 metadata test
 
 执行 4 节点并发测试：
+
+```bash
+scripts/aws_full_deploy.sh test
+```
+
+也可以直接调用底层脚本：
 
 ```bash
 scripts/run_metadata_test_all_nodes.sh
@@ -223,8 +237,7 @@ RustFS service 在第 4 台节点上，默认 S3 API 监听 `9000`。RustFS cons
 确认不再需要压测数据后销毁 AWS 资源：
 
 ```bash
-cd terraform/aws
-terraform destroy
+scripts/aws_full_deploy.sh destroy
 ```
 
 本地生成文件在 `.gitignore` 中已忽略，可按需删除：
