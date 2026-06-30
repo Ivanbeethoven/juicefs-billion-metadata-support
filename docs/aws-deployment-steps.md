@@ -9,6 +9,43 @@
 
 实际部署时，TiUP 会从第一台 TiKV 节点公网 IP 进入 VPC，再使用私网 IP 部署 3 节点 TiKV 集群。
 
+## Architecture
+
+```mermaid
+flowchart TB
+  operator["Operator / CI runner"]
+
+  subgraph aws["AWS VPC"]
+    direction TB
+
+    subgraph tikv_cluster["TiKV metadata cluster"]
+      direction LR
+      n1["EC2 tikv-1<br/>PD + TiKV<br/>JuiceFS client"]
+      n2["EC2 tikv-2<br/>PD + TiKV<br/>JuiceFS client"]
+      n3["EC2 tikv-3<br/>PD + TiKV<br/>JuiceFS client"]
+    end
+
+    rustfs["EC2 rustfs-1<br/>RustFS S3 API<br/>JuiceFS client"]
+  end
+
+  operator -->|"Terraform apply<br/>SSH to control host"| n1
+  n1 -->|"TiUP deploy over private IP"| n2
+  n1 -->|"TiUP deploy over private IP"| n3
+  n1 <-->|"PD quorum / TiKV Raft"| n2
+  n2 <-->|"PD quorum / TiKV Raft"| n3
+  n1 <-->|"PD quorum / TiKV Raft"| n3
+
+  n1 -->|"JuiceFS metadata<br/>tikv://pd-1,pd-2,pd-3/fs"| tikv_cluster
+  n2 -->|"JuiceFS metadata"| tikv_cluster
+  n3 -->|"JuiceFS metadata"| tikv_cluster
+  rustfs -->|"JuiceFS metadata"| tikv_cluster
+
+  n1 -->|"JuiceFS objects<br/>S3 API :9000"| rustfs
+  n2 -->|"JuiceFS objects"| rustfs
+  n3 -->|"JuiceFS objects"| rustfs
+  rustfs -->|"local JuiceFS client objects"| rustfs
+```
+
 ## 1. 前置条件
 
 本地控制机需要：
@@ -213,7 +250,44 @@ scripts/run_metadata_test_all_nodes.sh
 EXTRA_MDTEST_ARGS="--rand" scripts/run_metadata_test_all_nodes.sh
 ```
 
-## 7. 常用检查
+## 7. 运行小文件写入测试并生成报告
+
+metadata test 更偏元数据路径；如果要通过已挂载的 JuiceFS 尽可能写入大量真实小文件，运行：
+
+```bash
+scripts/aws_full_deploy.sh write-test
+```
+
+这个命令会：
+
+- 读取 `terraform/aws/generated/juicefs-aws.env`。
+- 并发登录 `JUICEFS_TEST_HOSTS` 中的 4 台节点。
+- 在每台节点的 `MOUNT_POINT` 下创建多 worker 小文件写入任务。
+- 收集每台节点的 `files_written`、`bytes_written`、`elapsed_seconds`、`files_per_second` 和错误数。
+- 在本地生成 Markdown 报告，默认路径为 `reports/file-write-<timestamp>/summary.md`。
+
+常用参数：
+
+```bash
+FILE_WRITE_TARGET_PER_NODE=25000000 \
+FILE_WRITE_SIZE_BYTES=1 \
+FILE_WRITE_WORKERS=256 \
+FILES_PER_DIR=100000 \
+scripts/aws_full_deploy.sh write-test
+```
+
+如果希望按时间尽量写入，而不是固定文件数，可以设置最大运行秒数：
+
+```bash
+FILE_WRITE_TARGET_PER_NODE=1000000000 \
+FILE_WRITE_MAX_SECONDS=3600 \
+FILE_WRITE_WORKERS=256 \
+scripts/aws_full_deploy.sh write-test
+```
+
+每次测试会在挂载点下创建形如 `filewrite-<host>-<timestamp>` 的目录。报告会记录每台机器的具体测试目录，清理前先确认不再需要这些文件。
+
+## 8. 常用检查
 
 在控制机查看 TiKV 集群：
 
@@ -232,7 +306,7 @@ juicefs info "$META_URL" /
 
 RustFS service 在第 4 台节点上，默认 S3 API 监听 `9000`。RustFS console 端口 `9001` 默认不开放公网；只有设置 `expose_rustfs_console = true` 后才会对 `allowed_ssh_cidrs` 放行。
 
-## 8. 清理资源
+## 9. 清理资源
 
 确认不再需要压测数据后销毁 AWS 资源：
 
@@ -252,7 +326,7 @@ CONFIRM_DESTROY=1 AUTO_APPROVE=0 scripts/aws_full_deploy.sh destroy
 rm -rf .terraform terraform.tfstate terraform.tfstate.backup generated/*
 ```
 
-## 9. 排障
+## 10. 排障
 
 cloud-init 或二进制安装失败时，登录对应节点查看：
 

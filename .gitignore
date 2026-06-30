@@ -9,6 +9,7 @@ __pycache__/
 *.pyc
 .DS_Store
 .downloads/
+reports/
 *.env
 !examples/*.env.example
 *.tar.gz

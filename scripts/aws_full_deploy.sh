@@ -12,12 +12,15 @@ ACTION="${1:-deploy}"
 usage() {
   cat <<'EOF'
 Usage:
-  scripts/aws_full_deploy.sh [deploy|test|destroy|output]
+  scripts/aws_full_deploy.sh [deploy|test|write-test|destroy|output]
 
 Actions:
   deploy   Generate terraform.tfvars when missing, run terraform init/apply,
            deploy TiKV inside the VPC, and format JuiceFS.
   test     Load generated env and run distributed JuiceFS metadata test.
+  write-test
+           Load generated env, write many small files through mounted JuiceFS,
+           and generate a Markdown report under reports/.
   destroy  Destroy AWS resources with terraform destroy.
   output   Show terraform outputs.
 
@@ -136,6 +139,12 @@ run_metadata_test() {
   "${SCRIPT_DIR}/run_metadata_test_all_nodes.sh"
 }
 
+run_file_write_test() {
+  load_env
+  log "run distributed file write test"
+  "${SCRIPT_DIR}/run_file_write_test_all_nodes.sh"
+}
+
 case "$ACTION" in
   -h|--help|help)
     usage
@@ -163,6 +172,9 @@ case "$ACTION" in
     ;;
   test)
     run_metadata_test
+    ;;
+  write-test)
+    run_file_write_test
     ;;
   destroy)
     terraform_destroy

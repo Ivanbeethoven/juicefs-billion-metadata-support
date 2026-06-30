@@ -35,6 +35,7 @@ scripts/
   format_juicefs.sh                初始化 JuiceFS
   run_aws_deploy.sh                在 AWS VPC 内部署 TiKV 并 format JuiceFS
   run_metadata_test_all_nodes.sh   4 节点并发 metadata test
+  run_file_write_test_all_nodes.sh 4 节点并发小文件写入测试并生成报告
 tiup/
   topology.3tikv.example.yaml
 ```
@@ -52,6 +53,14 @@ scripts/aws_full_deploy.sh deploy
 ```bash
 scripts/aws_full_deploy.sh test
 ```
+
+部署完成后，也可以跑真实小文件写入测试并生成报告：
+
+```bash
+scripts/aws_full_deploy.sh write-test
+```
+
+报告默认写到 `reports/file-write-<timestamp>/summary.md`。
 
 如果要部署后立刻跑 metadata test：
 
