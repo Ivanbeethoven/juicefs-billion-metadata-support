@@ -237,7 +237,13 @@ RustFS service 在第 4 台节点上，默认 S3 API 监听 `9000`。RustFS cons
 确认不再需要压测数据后销毁 AWS 资源：
 
 ```bash
-scripts/aws_full_deploy.sh destroy
+CONFIRM_DESTROY=1 scripts/aws_full_deploy.sh destroy
+```
+
+默认仍会使用 `terraform destroy -auto-approve`；如果希望 Terraform 逐项确认：
+
+```bash
+CONFIRM_DESTROY=1 AUTO_APPROVE=0 scripts/aws_full_deploy.sh destroy
 ```
 
 本地生成文件在 `.gitignore` 中已忽略，可按需删除：

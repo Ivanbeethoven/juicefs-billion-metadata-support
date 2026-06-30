@@ -59,6 +59,12 @@ scripts/aws_full_deploy.sh test
 RUN_METADATA_TEST=1 scripts/aws_full_deploy.sh deploy
 ```
 
+销毁 AWS 资源需要显式确认：
+
+```bash
+CONFIRM_DESTROY=1 scripts/aws_full_deploy.sh destroy
+```
+
 Terraform 会生成：
 
 - `tiup/topology.aws.generated.yaml`

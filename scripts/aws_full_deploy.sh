@@ -33,6 +33,7 @@ Common environment overrides:
 
 Safety switches:
   AUTO_APPROVE=0      Prompt during terraform apply/destroy. Default: 1.
+  CONFIRM_DESTROY=1   Required for destroy action.
   FORCE_TFVARS=1      Regenerate terraform.tfvars even when it exists.
   RUN_METADATA_TEST=1 Run metadata test after deploy. Default: 0.
   SKIP_TERRAFORM=1    Reuse existing terraform outputs/env.
@@ -57,6 +58,13 @@ terraform_cmd() {
   "$TERRAFORM_BIN" -chdir="$TF_DIR" "$@"
 }
 
+tfvars_args() {
+  default_tfvars="${TF_DIR}/terraform.tfvars"
+  if [ "$(cd "$(dirname "$TFVARS_FILE")" && pwd)/$(basename "$TFVARS_FILE")" != "$(cd "$(dirname "$default_tfvars")" && pwd)/$(basename "$default_tfvars")" ]; then
+    printf '%s\n' "-var-file=${TFVARS_FILE}"
+  fi
+}
+
 load_env() {
   [ -f "$ENV_FILE" ] || die "generated env not found: ${ENV_FILE}"
   set -a
@@ -76,29 +84,43 @@ generate_tfvars_if_needed() {
 
 terraform_apply() {
   need_cmd "$TERRAFORM_BIN"
+  var_args=()
+  while IFS= read -r arg; do
+    [ -n "$arg" ] && var_args+=("$arg")
+  done < <(tfvars_args)
+
   log "terraform init"
   terraform_cmd init -input=false
 
   if [ "${AUTO_APPROVE:-1}" = "1" ]; then
     log "terraform apply -auto-approve"
-    terraform_cmd apply -auto-approve
+    terraform_cmd apply "${var_args[@]}" -auto-approve
   else
     log "terraform apply"
-    terraform_cmd apply
+    terraform_cmd apply "${var_args[@]}"
   fi
 }
 
 terraform_destroy() {
+  if [ "${CONFIRM_DESTROY:-0}" != "1" ]; then
+    die "destroy requires CONFIRM_DESTROY=1"
+  fi
+
   need_cmd "$TERRAFORM_BIN"
+  var_args=()
+  while IFS= read -r arg; do
+    [ -n "$arg" ] && var_args+=("$arg")
+  done < <(tfvars_args)
+
   log "terraform init"
   terraform_cmd init -input=false
 
   if [ "${AUTO_APPROVE:-1}" = "1" ]; then
     log "terraform destroy -auto-approve"
-    terraform_cmd destroy -auto-approve
+    terraform_cmd destroy "${var_args[@]}" -auto-approve
   else
     log "terraform destroy"
-    terraform_cmd destroy
+    terraform_cmd destroy "${var_args[@]}"
   fi
 }
 

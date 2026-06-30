@@ -36,7 +36,9 @@ detect_public_cidr() {
     fi
   done
 
-  printf '%s\n' "203.0.113.10/32"
+  echo "failed to detect public IP; set ALLOWED_SSH_CIDRS explicitly" >&2
+  echo "example: ALLOWED_SSH_CIDRS=\"203.0.113.10/32\" scripts/generate_aws_tfvars.sh" >&2
+  return 1
 }
 
 hcl_string() {
