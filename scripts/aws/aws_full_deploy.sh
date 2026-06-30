@@ -12,9 +12,12 @@ ACTION="${1:-deploy}"
 usage() {
   cat <<'EOF'
 Usage:
-  scripts/aws_full_deploy.sh [deploy|test|write-test|destroy|output]
+  scripts/aws_full_deploy.sh [provision|deploy|test|write-test|destroy|output]
 
 Actions:
+  provision
+           Generate terraform.tfvars when missing, run terraform init/apply,
+           and wait for EC2 cloud-init bootstrap to finish.
   deploy   Generate terraform.tfvars when missing, run terraform init/apply,
            deploy TiKV inside the VPC, and format JuiceFS.
   test     Load generated env and run distributed JuiceFS metadata test.
@@ -133,6 +136,12 @@ deploy_cluster() {
   ENV_FILE="$ENV_FILE" "${SCRIPT_DIR}/run_aws_deploy.sh"
 }
 
+wait_cloud_init() {
+  load_env
+  log "wait for EC2 cloud-init bootstrap"
+  "${SCRIPT_DIR}/wait_aws_nodes.sh"
+}
+
 run_metadata_test() {
   load_env
   log "run distributed metadata test"
@@ -148,6 +157,17 @@ run_file_write_test() {
 case "$ACTION" in
   -h|--help|help)
     usage
+    ;;
+  provision)
+    need_cmd curl
+    generate_tfvars_if_needed
+    if [ "${SKIP_TERRAFORM:-0}" != "1" ]; then
+      terraform_apply
+    else
+      log "skip terraform apply"
+    fi
+    wait_cloud_init
+    log "machines are ready; TiKV/JuiceFS deployment not started"
     ;;
   deploy)
     need_cmd curl

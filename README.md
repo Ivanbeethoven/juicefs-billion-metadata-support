@@ -24,7 +24,7 @@ JuiceFS objects  -> RustFS S3 API
 scripts/aws_full_deploy.sh deploy
 ```
 
-这个入口会自动完成：
+这个入口会自动完成机器创建、cloud-init、TiKV 部署和 JuiceFS 初始化：
 
 - 生成 `terraform/aws/terraform.tfvars`
 - 自动探测当前公网 IP 并写入 SSH allowlist
@@ -33,6 +33,18 @@ scripts/aws_full_deploy.sh deploy
 - 等待 4 台 EC2 完成 cloud-init
 - 在 VPC 内部署 `3 PD + 3 TiKV`
 - 初始化 JuiceFS，metadata 使用 TiKV，object storage 使用 RustFS
+
+如果只想先把 4 台 EC2 建好并完成 cloud-init，不部署 TiKV、不 format JuiceFS：
+
+```bash
+scripts/aws_full_deploy.sh provision
+```
+
+`provision` 会停在“机器已可 SSH、基础软件和 RustFS 节点 bootstrap 完成”的状态，后续再执行完整部署：
+
+```bash
+SKIP_TERRAFORM=1 scripts/aws_full_deploy.sh deploy
+```
 
 部署完成后运行 metadata test：
 

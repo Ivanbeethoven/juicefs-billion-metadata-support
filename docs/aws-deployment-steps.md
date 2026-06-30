@@ -67,6 +67,18 @@ scripts/aws_full_deploy.sh deploy
 
 它会自动生成 `terraform.tfvars`、执行 `terraform init/apply`、等待 4 台节点初始化、部署 `3 PD + 3 TiKV`，并初始化 JuiceFS。
 
+如果只想先创建 4 台 EC2 并等 cloud-init 完成，不部署 TiKV、不初始化 JuiceFS：
+
+```bash
+scripts/aws_full_deploy.sh provision
+```
+
+机器准备好后再继续部署：
+
+```bash
+SKIP_TERRAFORM=1 scripts/aws_full_deploy.sh deploy
+```
+
 如果希望先只生成配置再检查，使用：
 
 ```bash
