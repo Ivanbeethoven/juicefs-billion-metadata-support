@@ -1,0 +1,32 @@
+global:
+  user: tikv
+  ssh_port: 22
+  deploy_dir: /data/tikv/deploy
+  data_dir: /data/tikv/data
+
+server_configs:
+  pd:
+    replication.location-labels: ["zone", "host"]
+    replication.max-replicas: 3
+  tikv:
+    storage.reserve-space: 100GiB
+    raftstore.capacity: 1.5TiB
+
+pd_servers:
+%{ for index, ip in tikv_private_ips ~}
+  - host: ${ip}
+    name: pd-${index + 1}
+    client_port: 2379
+    peer_port: 2380
+%{ endfor ~}
+
+tikv_servers:
+%{ for index, ip in tikv_private_ips ~}
+  - host: ${ip}
+    port: 20160
+    status_port: 20180
+    config:
+      server.labels:
+        zone: ${zones[index]}
+        host: tikv-${index + 1}
+%{ endfor ~}

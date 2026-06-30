@@ -1,0 +1,156 @@
+#!/usr/bin/env bash
+set -euxo pipefail
+
+ROLE="${role}"
+HOSTNAME_VALUE="${hostname}"
+DATA_MOUNT="${data_mount}"
+JUICEFS_VERSION="${juicefs_version}"
+JUICEFS_ARCH="${juicefs_arch}"
+RUSTFS_DOWNLOAD_URL="${rustfs_download_url}"
+RUSTFS_ACCESS_KEY="${rustfs_access_key}"
+RUSTFS_SECRET_KEY="${rustfs_secret_key}"
+RUSTFS_BUCKET="${rustfs_bucket}"
+
+hostnamectl set-hostname "$HOSTNAME_VALUE"
+
+export DEBIAN_FRONTEND=noninteractive
+apt-get update
+apt-get install -y ca-certificates curl wget tar gzip unzip xfsprogs jq fuse3 fio
+
+swapoff -a || true
+sed -i.bak '/[[:space:]]swap[[:space:]]/ s/^/#/' /etc/fstab || true
+cat >/etc/sysctl.d/99-juicefs-tikv.conf <<'EOF'
+vm.swappiness = 0
+net.core.somaxconn = 32768
+net.ipv4.tcp_syncookies = 0
+fs.file-max = 20971520
+EOF
+sysctl --system || true
+
+if [ -f /sys/kernel/mm/transparent_hugepage/enabled ]; then
+  echo never >/sys/kernel/mm/transparent_hugepage/enabled || true
+fi
+if [ -f /sys/kernel/mm/transparent_hugepage/defrag ]; then
+  echo never >/sys/kernel/mm/transparent_hugepage/defrag || true
+fi
+
+find_data_disk() {
+  for name in $(lsblk -ndo NAME,TYPE | awk '$2 == "disk" {print $1}'); do
+    dev="/dev/$name"
+    if lsblk -nro MOUNTPOINT "$dev" | grep -q '/'; then
+      continue
+    fi
+    echo "$dev"
+    return 0
+  done
+  return 1
+}
+
+DATA_DEVICE="$(find_data_disk || true)"
+if [ -n "$DATA_DEVICE" ]; then
+  if ! blkid "$DATA_DEVICE"; then
+    mkfs.xfs -f "$DATA_DEVICE"
+  fi
+  mkdir -p "$DATA_MOUNT"
+  uuid="$(blkid -s UUID -o value "$DATA_DEVICE")"
+  if ! grep -q "$uuid" /etc/fstab; then
+    echo "UUID=$uuid $DATA_MOUNT xfs defaults,nofail,noatime 0 2" >>/etc/fstab
+  fi
+  mount "$DATA_MOUNT" || mount -a
+else
+  mkdir -p "$DATA_MOUNT"
+fi
+
+mkdir -p /var/lib/juicefs/cache
+chmod 777 /var/lib/juicefs/cache
+
+if ! id tikv >/dev/null 2>&1; then
+  useradd -m -s /bin/bash tikv
+fi
+mkdir -p /data/tikv/deploy /data/tikv/data
+chown -R tikv:tikv /data/tikv || true
+
+install_juicefs() {
+  workdir="$(mktemp -d)"
+  pkg="juicefs-$JUICEFS_VERSION-linux-$JUICEFS_ARCH.tar.gz"
+  curl -fL "https://github.com/juicedata/juicefs/releases/download/v$JUICEFS_VERSION/$pkg" -o "$workdir/$pkg"
+  curl -fL "https://github.com/juicedata/juicefs/releases/download/v$JUICEFS_VERSION/checksums.txt" -o "$workdir/checksums.txt"
+  (
+    cd "$workdir"
+    grep " $pkg$" checksums.txt | sha256sum -c -
+    tar -zxf "$pkg"
+  )
+  install -m 0755 "$workdir/juicefs" /usr/local/bin/juicefs
+  rm -rf "$workdir"
+}
+
+install_juicefs
+
+if [ "$ROLE" = "rustfs" ]; then
+  workdir="$(mktemp -d)"
+  curl -fL "$RUSTFS_DOWNLOAD_URL" -o "$workdir/rustfs.zip"
+  unzip -q "$workdir/rustfs.zip" -d "$workdir"
+  rustfs_bin="$(find "$workdir" -type f -name rustfs | head -n 1)"
+  install -m 0755 "$rustfs_bin" /usr/local/bin/rustfs
+  rm -rf "$workdir"
+
+  mkdir -p "$DATA_MOUNT/data" /var/logs/rustfs
+  cat >/etc/default/rustfs <<EOF
+RUSTFS_ACCESS_KEY=$RUSTFS_ACCESS_KEY
+RUSTFS_SECRET_KEY=$RUSTFS_SECRET_KEY
+RUSTFS_VOLUMES="$DATA_MOUNT/data"
+RUSTFS_ADDRESS=":9000"
+RUSTFS_CONSOLE_ADDRESS=":9001"
+RUSTFS_CONSOLE_ENABLE=true
+RUST_LOG=error
+RUSTFS_OBS_LOG_DIRECTORY="/var/logs/rustfs"
+EOF
+
+  cat >/etc/systemd/system/rustfs.service <<'EOF'
+[Unit]
+Description=RustFS Object Storage Server
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=notify
+NotifyAccess=main
+User=root
+Group=root
+WorkingDirectory=/usr/local
+EnvironmentFile=-/etc/default/rustfs
+ExecStart=/usr/local/bin/rustfs $RUSTFS_VOLUMES
+LimitNOFILE=1048576
+LimitNPROC=32768
+TasksMax=infinity
+Restart=always
+RestartSec=10s
+OOMScoreAdjust=-1000
+SendSIGKILL=no
+TimeoutStartSec=60s
+TimeoutStopSec=60s
+NoNewPrivileges=true
+ProtectHome=true
+PrivateTmp=true
+StandardOutput=append:/var/logs/rustfs/rustfs.log
+StandardError=append:/var/logs/rustfs/rustfs-err.log
+
+[Install]
+WantedBy=multi-user.target
+EOF
+  systemctl daemon-reload
+  systemctl enable --now rustfs.service
+
+  curl -fL https://dl.min.io/client/mc/release/linux-amd64/mc -o /usr/local/bin/mc
+  chmod 0755 /usr/local/bin/mc
+  for _ in $(seq 1 60); do
+    if /usr/local/bin/mc alias set rustfs http://127.0.0.1:9000 "$RUSTFS_ACCESS_KEY" "$RUSTFS_SECRET_KEY" >/dev/null 2>&1; then
+      break
+    fi
+    sleep 2
+  done
+  /usr/local/bin/mc alias set rustfs http://127.0.0.1:9000 "$RUSTFS_ACCESS_KEY" "$RUSTFS_SECRET_KEY"
+  /usr/local/bin/mc mb --ignore-existing "rustfs/$RUSTFS_BUCKET"
+fi
+
+echo "node bootstrap complete: $HOSTNAME_VALUE role=$ROLE" >/var/log/juicefs-bootstrap.done

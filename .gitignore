@@ -4,7 +4,14 @@
 terraform.tfvars
 terraform-output.json
 topology.generated.yaml
+topology.aws.generated.yaml
 __pycache__/
 *.pyc
 .DS_Store
-
+.downloads/
+*.env
+!examples/*.env.example
+*.tar.gz
+*.pem
+terraform/aws/generated/*
+!terraform/aws/generated/.gitkeep
