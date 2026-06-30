@@ -16,29 +16,57 @@
 - AWS credential 已配置好，例如 `AWS_PROFILE`、`AWS_ACCESS_KEY_ID` 或实例角色。
 - Terraform `>= 1.5`。
 - 能从当前公网出口 SSH 到 EC2。把你的办公网或 VPN CIDR 写入 `allowed_ssh_cidrs`。
+- 本地有 `curl`，用于自动探测公网 IP；有 `openssl` 时会优先用于生成随机密钥。
 - AWS 配额足够创建 4 台实例、4 块数据盘和 gp3 IOPS/throughput。
 - 不要把真实 `terraform.tfvars`、生成的 env、state、pem 文件提交到仓库。
 
 ## 2. 配置 Terraform
 
-进入 Terraform 目录并生成本地配置：
+推荐用脚本生成本地配置：
 
 ```bash
-cd terraform/aws
-cp terraform.tfvars.example terraform.tfvars
-vi terraform.tfvars
+scripts/generate_aws_tfvars.sh
 ```
 
-至少修改这些值：
+脚本会自动：
+
+- 探测当前公网 IP，并写入 `allowed_ssh_cidrs = ["<ip>/32"]`。
+- 生成 32 位 shell-safe `rustfs_secret_key`。
+- 写出 `terraform/aws/terraform.tfvars`，权限设为 `0600`。
+
+生成后可以按需查看和调整：
+
+```bash
+vi terraform/aws/terraform.tfvars
+```
+
+常用覆盖方式：
+
+```bash
+AWS_REGION=us-west-2 \
+PROJECT_NAME=juicefs-prod \
+ALLOWED_SSH_CIDRS="203.0.113.10/32,198.51.100.20/32" \
+TIKV_INSTANCE_TYPE=i4i.2xlarge \
+RUSTFS_INSTANCE_TYPE=i4i.2xlarge \
+scripts/generate_aws_tfvars.sh
+```
+
+如果文件已存在，脚本默认拒绝覆盖。确认要重建时：
+
+```bash
+FORCE=1 scripts/generate_aws_tfvars.sh
+```
+
+关键配置示例：
 
 ```hcl
 aws_region = "us-east-1"
 project_name = "juicefs-3tikv"
 
-allowed_ssh_cidrs = ["你的公网出口/32"]
+allowed_ssh_cidrs = ["自动探测到的公网出口/32"]
 expose_rustfs_console = false
 
-rustfs_secret_key = "至少16位的强随机字符串"
+rustfs_secret_key = "脚本自动生成的随机字符串"
 rustfs_bucket = "juicefs-prod"
 jfs_name = "juicefs-prod"
 ```
@@ -79,14 +107,8 @@ test_threads = 256
 执行 Terraform：
 
 ```bash
-terraform init
-terraform apply
-```
-
-完成后回到仓库根目录：
-
-```bash
-cd ../..
+terraform -chdir=terraform/aws init
+terraform -chdir=terraform/aws apply
 ```
 
 Terraform 会生成这些部署文件：

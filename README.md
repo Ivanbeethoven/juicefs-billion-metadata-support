@@ -24,6 +24,7 @@ docs/
 examples/
   juicefs-3tikv.env.example
 scripts/
+  generate_aws_tfvars.sh           生成 terraform.tfvars 和随机密钥
   install_tiup_binary.sh           安装 TiUP/TiKV 二进制包
   deploy_3tikv_cluster.sh          部署 3 PD + 3 TiKV
   install_juicefs_binary.sh        安装 JuiceFS 二进制
@@ -42,12 +43,9 @@ tiup/
 完整逐步部署说明见 [AWS deployment steps](docs/aws-deployment-steps.md)。
 
 ```bash
-cd terraform/aws
-cp terraform.tfvars.example terraform.tfvars
-vi terraform.tfvars
-terraform init
-terraform apply
-cd ../..
+scripts/generate_aws_tfvars.sh
+terraform -chdir=terraform/aws init
+terraform -chdir=terraform/aws apply
 ```
 
 Terraform 会生成：
@@ -87,8 +85,9 @@ test_threads       = 256
 ## 安全默认
 
 - Terraform 默认不开放 SSH，必须在 `allowed_ssh_cidrs` 填你的办公网/VPN CIDR。
+- `scripts/generate_aws_tfvars.sh` 会自动探测当前公网 IP 并生成 `/32`，也可以用 `ALLOWED_SSH_CIDRS` 覆盖。
 - RustFS console 默认不暴露公网，需显式设置 `expose_rustfs_console = true`。
-- `rustfs_secret_key` 必须在 `terraform.tfvars` 中设置，至少 16 个 shell-safe 字符。
+- `rustfs_secret_key` 会由脚本自动生成，至少 16 个 shell-safe 字符。
 - 生成的私钥、env、state、下载包都已加入 `.gitignore`。
 
 ## 手工/非 AWS 流程
