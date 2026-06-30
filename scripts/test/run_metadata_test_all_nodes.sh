@@ -5,7 +5,8 @@ JUICEFS_TEST_HOSTS="${JUICEFS_TEST_HOSTS:-}"
 SSH_USER="${SSH_USER:-ubuntu}"
 SSH_KEY="${SSH_KEY:-}"
 REMOTE_SCRIPT="${REMOTE_SCRIPT:-/tmp/run_metadata_test.sh}"
-TARGET_FILES_PER_NODE="${TARGET_FILES_PER_NODE:-1000000}"
+TARGET_TOTAL_FILES="${TARGET_TOTAL_FILES:-}"
+TARGET_FILES_PER_NODE="${TARGET_FILES_PER_NODE:-}"
 FILES_PER_DIR="${FILES_PER_DIR:-10000}"
 THREADS="${THREADS:-64}"
 WRITE_SIZE="${WRITE_SIZE:-1}"
@@ -14,6 +15,7 @@ MDTEST_DIRS="${MDTEST_DIRS:-}"
 EXTRA_MDTEST_ARGS="${EXTRA_MDTEST_ARGS:-}"
 TEST_PREFIX="${TEST_PREFIX:-mdtest}"
 META_URL="${META_URL:-}"
+DRY_RUN="${DRY_RUN:-0}"
 
 if [ -z "$JUICEFS_TEST_HOSTS" ]; then
   echo "JUICEFS_TEST_HOSTS is required, use space separated host list" >&2
@@ -23,6 +25,25 @@ fi
 if [ -z "$META_URL" ]; then
   echo "META_URL is required" >&2
   exit 1
+fi
+
+host_count="$(printf '%s\n' $JUICEFS_TEST_HOSTS | wc -l | tr -d ' ')"
+if [ -z "$TARGET_FILES_PER_NODE" ]; then
+  if [ -n "$TARGET_TOTAL_FILES" ]; then
+    TARGET_FILES_PER_NODE=$(( (TARGET_TOTAL_FILES + host_count - 1) / host_count ))
+  else
+    TARGET_FILES_PER_NODE=1000000
+  fi
+fi
+
+echo "metadata test target:"
+echo "  hosts: ${host_count}"
+echo "  target total files: ${TARGET_TOTAL_FILES:-auto}"
+echo "  target files per node: ${TARGET_FILES_PER_NODE}"
+
+if [ "$DRY_RUN" = "1" ]; then
+  echo "dry run only; skip SSH execution"
+  exit 0
 fi
 
 script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"

@@ -91,14 +91,59 @@ files_per_dir      = 100000
 test_threads       = 256
 ```
 
-真实写入测试常用参数：
+## Test File Counts
+
+有两类测试，文件数量都可以配置。
+
+Metadata test 使用 JuiceFS `mdtest`，主要压 metadata 路径：
 
 ```bash
-FILE_WRITE_TARGET_PER_NODE=25000000 \
+# 总目标文件数，脚本按 JUICEFS_TEST_HOSTS 节点数自动平分
+TARGET_TOTAL_FILES=100000000 scripts/aws_full_deploy.sh test
+
+# 或者直接指定每台节点目标文件数
+TARGET_FILES_PER_NODE=25000000 scripts/aws_full_deploy.sh test
+```
+
+Terraform 生成的默认值是 `target_total_files = 100000000`，4 台节点时会生成 `TARGET_FILES_PER_NODE=25000000`。由于 `mdtest` 要按目录树取整，实际创建文件数可能略高于目标值。
+
+真实写入测试通过 JuiceFS 挂载点创建小文件，并生成 Markdown 报告：
+
+```bash
+# 总目标文件数，脚本按 JUICEFS_TEST_HOSTS 节点数自动平分
+FILE_WRITE_TOTAL_FILES=100000000 \
 FILE_WRITE_SIZE_BYTES=1 \
 FILE_WRITE_WORKERS=256 \
 FILES_PER_DIR=100000 \
 scripts/aws_full_deploy.sh write-test
+```
+
+也可以指定每台节点写入数量：
+
+```bash
+FILE_WRITE_TARGET_PER_NODE=25000000 scripts/aws_full_deploy.sh write-test
+```
+
+先小规模试跑可以这样：
+
+```bash
+TARGET_TOTAL_FILES=1000000 scripts/aws_full_deploy.sh test
+FILE_WRITE_TOTAL_FILES=1000000 scripts/aws_full_deploy.sh write-test
+```
+
+只检查文件数量分配、不连接远端机器：
+
+```bash
+JUICEFS_TEST_HOSTS="host1 host2 host3 host4" \
+META_URL=tikv://127.0.0.1:2379/jfs \
+TARGET_TOTAL_FILES=100000000 \
+DRY_RUN=1 \
+scripts/test/run_metadata_test_all_nodes.sh
+
+JUICEFS_TEST_HOSTS="host1 host2 host3 host4" \
+FILE_WRITE_TOTAL_FILES=100000000 \
+DRY_RUN=1 \
+scripts/test/run_file_write_test_all_nodes.sh
 ```
 
 ## Repository Layout

@@ -17,17 +17,40 @@ SSH_KEY="${SSH_KEY:-}"
 REMOTE_SCRIPT="${REMOTE_SCRIPT:-/tmp/run_file_write_test.sh}"
 TEST_PREFIX="${TEST_PREFIX:-filewrite}"
 MOUNT_POINT="${MOUNT_POINT:-/mnt/${JFS_NAME:-juicefs-prod}}"
-TARGET_FILES_PER_NODE="${FILE_WRITE_TARGET_PER_NODE:-${TARGET_FILES_PER_NODE:-1000000}}"
+FILE_WRITE_TOTAL_FILES="${FILE_WRITE_TOTAL_FILES:-}"
+TARGET_FILES_PER_NODE="${FILE_WRITE_TARGET_PER_NODE:-${TARGET_FILES_PER_NODE:-}}"
 FILE_SIZE_BYTES="${FILE_WRITE_SIZE_BYTES:-${WRITE_SIZE:-1}}"
 FILES_PER_DIR="${FILES_PER_DIR:-10000}"
 WORKERS="${FILE_WRITE_WORKERS:-${THREADS:-64}}"
 MAX_SECONDS="${FILE_WRITE_MAX_SECONDS:-0}"
 SYNC_EVERY="${FILE_WRITE_SYNC_EVERY:-0}"
 REPORT_DIR="${REPORT_DIR:-${REPO_ROOT}/reports/file-write-$(date +%Y%m%d-%H%M%S)}"
+DRY_RUN="${DRY_RUN:-0}"
 
 if [ -z "$JUICEFS_TEST_HOSTS" ]; then
   echo "JUICEFS_TEST_HOSTS is required, use space separated host list" >&2
   exit 1
+fi
+
+host_count="$(printf '%s\n' $JUICEFS_TEST_HOSTS | wc -l | tr -d ' ')"
+if [ -z "$TARGET_FILES_PER_NODE" ]; then
+  if [ -n "$FILE_WRITE_TOTAL_FILES" ]; then
+    TARGET_FILES_PER_NODE=$(( (FILE_WRITE_TOTAL_FILES + host_count - 1) / host_count ))
+  else
+    TARGET_FILES_PER_NODE=1000000
+  fi
+fi
+
+echo "file write test target:"
+echo "  hosts: ${host_count}"
+echo "  target total files: ${FILE_WRITE_TOTAL_FILES:-auto}"
+echo "  target files per node: ${TARGET_FILES_PER_NODE}"
+echo "  file size bytes: ${FILE_SIZE_BYTES}"
+echo "  workers per node: ${WORKERS}"
+
+if [ "$DRY_RUN" = "1" ]; then
+  echo "dry run only; skip SSH execution"
+  exit 0
 fi
 
 mkdir -p "$REPORT_DIR"
@@ -80,6 +103,8 @@ total_errors=0
   echo
   echo "- Generated at: $(date -u '+%Y-%m-%dT%H:%M:%SZ')"
   echo "- Mount point: \`${MOUNT_POINT}\`"
+  echo "- Hosts: \`${host_count}\`"
+  echo "- Target total files: \`${FILE_WRITE_TOTAL_FILES:-auto}\`"
   echo "- Target files per node: \`${TARGET_FILES_PER_NODE}\`"
   echo "- File size bytes: \`${FILE_SIZE_BYTES}\`"
   echo "- Files per directory: \`${FILES_PER_DIR}\`"
