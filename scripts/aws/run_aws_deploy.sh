@@ -30,6 +30,10 @@ if [ -z "${SSH_KEY:-}" ] || [ ! -f "$SSH_KEY" ]; then
   exit 1
 fi
 
+if [ -n "${TOPOLOGY:-}" ] && [ ! -f "$TOPOLOGY" ] && [ -f "${REPO_ROOT}/${TOPOLOGY}" ]; then
+  TOPOLOGY="${REPO_ROOT}/${TOPOLOGY}"
+fi
+
 if [ -z "${TOPOLOGY:-}" ] || [ ! -f "$TOPOLOGY" ]; then
   echo "TOPOLOGY must point to a readable TiUP topology file" >&2
   exit 1
