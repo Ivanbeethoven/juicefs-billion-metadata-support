@@ -70,7 +70,7 @@ scripts/aws_full_deploy.sh deploy
 如果希望先只生成配置再检查，使用：
 
 ```bash
-scripts/generate_aws_tfvars.sh
+scripts/aws/generate_aws_tfvars.sh
 ```
 
 脚本会自动：
@@ -93,13 +93,13 @@ PROJECT_NAME=juicefs-prod \
 ALLOWED_SSH_CIDRS="203.0.113.10/32,198.51.100.20/32" \
 TIKV_INSTANCE_TYPE=i4i.2xlarge \
 RUSTFS_INSTANCE_TYPE=i4i.2xlarge \
-scripts/generate_aws_tfvars.sh
+scripts/aws/generate_aws_tfvars.sh
 ```
 
 如果文件已存在，脚本默认拒绝覆盖。确认要重建时：
 
 ```bash
-FORCE=1 scripts/generate_aws_tfvars.sh
+FORCE=1 scripts/aws/generate_aws_tfvars.sh
 ```
 
 关键配置示例：
@@ -192,7 +192,7 @@ set +a
 如果没有使用总控脚本，运行部署脚本：
 
 ```bash
-scripts/run_aws_deploy.sh
+scripts/aws/run_aws_deploy.sh
 ```
 
 这个脚本会执行：
@@ -206,7 +206,7 @@ scripts/run_aws_deploy.sh
 如果只想先等待节点初始化完成，可以单独执行：
 
 ```bash
-scripts/wait_aws_nodes.sh
+scripts/aws/wait_aws_nodes.sh
 ```
 
 ## 6. 运行亿级小文件 metadata test
@@ -220,7 +220,7 @@ scripts/aws_full_deploy.sh test
 也可以直接调用底层脚本：
 
 ```bash
-scripts/run_metadata_test_all_nodes.sh
+scripts/test/run_metadata_test_all_nodes.sh
 ```
 
 默认参数来自 `terraform/aws/generated/juicefs-aws.env`：
@@ -233,7 +233,7 @@ DEPTH=2
 WRITE_SIZE=1
 ```
 
-`scripts/run_metadata_test.sh` 会根据 `FILES_PER_DIR`、`THREADS` 和 `DEPTH` 计算 JuiceFS `mdtest` 参数。由于目录树需要取整，默认配置每台实际估算约创建 `27,326,208` 个文件，4 台合计约 `109,304,832` 个文件，满足亿级小文件目标。
+`scripts/test/run_metadata_test.sh` 会根据 `FILES_PER_DIR`、`THREADS` 和 `DEPTH` 计算 JuiceFS `mdtest` 参数。由于目录树需要取整，默认配置每台实际估算约创建 `27,326,208` 个文件，4 台合计约 `109,304,832` 个文件，满足亿级小文件目标。
 
 临时调小规模验证可以覆盖环境变量：
 
@@ -241,13 +241,13 @@ WRITE_SIZE=1
 TARGET_FILES_PER_NODE=1000000 \
 FILES_PER_DIR=10000 \
 THREADS=64 \
-scripts/run_metadata_test_all_nodes.sh
+scripts/test/run_metadata_test_all_nodes.sh
 ```
 
 也可以追加 JuiceFS mdtest 参数：
 
 ```bash
-EXTRA_MDTEST_ARGS="--rand" scripts/run_metadata_test_all_nodes.sh
+EXTRA_MDTEST_ARGS="--rand" scripts/test/run_metadata_test_all_nodes.sh
 ```
 
 ## 7. 运行小文件写入测试并生成报告
@@ -335,7 +335,7 @@ sudo tail -200 /var/log/cloud-init-output.log
 sudo systemctl status rustfs
 ```
 
-`scripts/run_aws_deploy.sh` 无法 SSH 时，优先检查：
+`scripts/aws/run_aws_deploy.sh` 无法 SSH 时，优先检查：
 
 - `allowed_ssh_cidrs` 是否包含当前公网出口。
 - `SSH_KEY` 指向的私钥是否存在且权限正确。

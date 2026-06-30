@@ -46,7 +46,7 @@ output "private_key_file" {
 output "next_steps" {
   value = [
     "source terraform/aws/generated/juicefs-aws.env",
-    "scripts/run_aws_deploy.sh",
-    "scripts/run_metadata_test_all_nodes.sh",
+    "scripts/aws/run_aws_deploy.sh",
+    "scripts/test/run_metadata_test_all_nodes.sh",
   ]
 }

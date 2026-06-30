@@ -99,7 +99,7 @@ tiup cluster display juicefs-tikv-3
 JuiceFS 客户端升级使用：
 
 ```bash
-JUICEFS_VERSION=1.3.1 scripts/install_juicefs_binary.sh
+JUICEFS_VERSION=1.3.1 scripts/install/install_juicefs_binary.sh
 juicefs version
 sudo systemctl restart juicefs-prod.service
 ```

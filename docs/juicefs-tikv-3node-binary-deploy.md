@@ -42,13 +42,13 @@ set +a
 在第一台 TiKV 节点作为 VPC 内控制机部署 TiKV，并初始化 JuiceFS：
 
 ```bash
-scripts/run_aws_deploy.sh
+scripts/aws/run_aws_deploy.sh
 ```
 
 运行 4 节点并发 metadata test：
 
 ```bash
-scripts/run_metadata_test_all_nodes.sh
+scripts/test/run_metadata_test_all_nodes.sh
 ```
 
 ## 脚本化流程
@@ -66,32 +66,32 @@ set +a
 在 3 台 TiKV 目标机器上执行系统预处理：
 
 ```bash
-sudo DATA_ROOT=/data/tikv scripts/prepare_tikv_node.sh
+sudo DATA_ROOT=/data/tikv scripts/install/prepare_tikv_node.sh
 ```
 
 在控制机安装 TiUP 和 TiKV/PD 二进制包：
 
 ```bash
-scripts/install_tiup_binary.sh
+scripts/install/install_tiup_binary.sh
 ```
 
 部署 `3 PD + 3 TiKV`：
 
 ```bash
-scripts/deploy_3tikv_cluster.sh
+scripts/cluster/deploy_3tikv_cluster.sh
 ```
 
 在每台 JuiceFS 客户端机器安装 JuiceFS 二进制：
 
 ```bash
-scripts/install_juicefs_binary.sh
+scripts/install/install_juicefs_binary.sh
 ```
 
 初始化 JuiceFS 并安装 systemd 挂载服务：
 
 ```bash
-scripts/format_juicefs.sh
-sudo -E scripts/install_juicefs_mount_service.sh
+scripts/cluster/format_juicefs.sh
+sudo -E scripts/install/install_juicefs_mount_service.sh
 ```
 
 ## 机器规划

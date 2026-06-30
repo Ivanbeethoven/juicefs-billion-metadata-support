@@ -2,7 +2,7 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
+REPO_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
 ENV_FILE="${ENV_FILE:-${REPO_ROOT}/terraform/aws/generated/juicefs-aws.env}"
 REMOTE_DIR="${REMOTE_DIR:-/tmp/juicefs-aws-deploy}"
 
@@ -42,7 +42,7 @@ remote_key="${REMOTE_DIR}/ssh_key.pem"
 "${SCRIPT_DIR}/wait_aws_nodes.sh"
 
 ssh "${ssh_opts[@]}" "$control" "rm -rf '${REMOTE_DIR}' && mkdir -p '${REMOTE_DIR}'"
-scp "${ssh_opts[@]}" "${SCRIPT_DIR}/install_tiup_binary.sh" "${SCRIPT_DIR}/deploy_3tikv_cluster.sh" "${SCRIPT_DIR}/format_juicefs.sh" "$control:${REMOTE_DIR}/"
+scp "${ssh_opts[@]}" "${REPO_ROOT}/scripts/install/install_tiup_binary.sh" "${REPO_ROOT}/scripts/cluster/deploy_3tikv_cluster.sh" "${REPO_ROOT}/scripts/cluster/format_juicefs.sh" "$control:${REMOTE_DIR}/"
 scp "${ssh_opts[@]}" "$TOPOLOGY" "$control:${REMOTE_DIR}/topology.yaml"
 scp "${ssh_opts[@]}" "$SSH_KEY" "$control:${remote_key}"
 
