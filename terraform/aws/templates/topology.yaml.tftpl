@@ -9,8 +9,8 @@ server_configs:
     replication.location-labels: ["zone", "host"]
     replication.max-replicas: 3
   tikv:
-    storage.reserve-space: 100GiB
-    raftstore.capacity: 1.5TiB
+    storage.reserve-space: ${tikv_storage_reserve_space}
+    raftstore.capacity: ${tikv_raftstore_capacity}
 
 pd_servers:
 %{ for index, ip in tikv_private_ips ~}

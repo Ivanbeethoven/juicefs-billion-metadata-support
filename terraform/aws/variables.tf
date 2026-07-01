@@ -35,7 +35,7 @@ variable "expose_rustfs_console" {
 }
 
 variable "create_key_pair" {
-  description = "Create an EC2 key pair and write the private key into generated/. Set false to use key_name."
+  description = "Create an EC2 key pair and write the private key into run/<project>/. Set false to use key_name."
   type        = bool
   default     = true
 }
@@ -92,6 +92,18 @@ variable "rustfs_data_volume_size_gb" {
   description = "RustFS data EBS volume size."
   type        = number
   default     = 1024
+}
+
+variable "tikv_storage_reserve_space" {
+  description = "TiKV storage.reserve-space in TiUP topology."
+  type        = string
+  default     = "100GiB"
+}
+
+variable "tikv_raftstore_capacity" {
+  description = "TiKV raftstore.capacity in TiUP topology. Leave empty to auto set data volume size minus 128GiB."
+  type        = string
+  default     = ""
 }
 
 variable "data_volume_type" {

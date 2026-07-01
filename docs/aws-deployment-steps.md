@@ -85,7 +85,50 @@ run/slayerfs-rustfs/
 机器准备好后再继续部署：
 
 ```bash
-SKIP_TERRAFORM=1 scripts/aws_full_deploy.sh deploy
+scripts/aws_full_deploy.sh deploy-existing
+```
+
+如果你已经手工或用其他工具创建了 4 台机器，并且本机可以直接通过 SSH alias 连接：
+
+```bash
+ssh aws1
+ssh aws2
+ssh aws3
+ssh aws4
+```
+
+则可以让脚本从这些别名生成后续部署配置：
+
+```bash
+scripts/aws_full_deploy.sh ssh-env
+scripts/aws_full_deploy.sh bootstrap-existing
+scripts/aws_full_deploy.sh deploy-existing
+```
+
+默认约定：
+
+- `aws1`、`aws2`、`aws3` 作为 `PD + TiKV` 节点。
+- `aws4` 作为 RustFS 节点。
+- `ssh-env` 会探测各节点内网 IP，生成 `run/<project>/juicefs-aws.env` 和 `run/<project>/topology.ssh-alias.generated.yaml`。
+- 如果节点上已有 `/data/rustfs1` 这类测试数据盘，`ssh-env` 默认把 TiKV 放到 `/data/rustfs1/tikv`，把 JuiceFS cache 放到 `/data/rustfs2/juicefs-cache`。可用 `TIKV_DATA_ROOT`、`CACHE_DIR` 覆盖。
+- 默认会生成 `run/<project>/ssh-alias-deploy-key`，并把公钥追加到 4 台机器的 `authorized_keys`，这样控制机 `aws1` 可以继续通过内网 IP 部署 TiKV。
+- 如果 `aws4:/etc/default/rustfs` 读不到 RustFS 密钥，需要用 `RUSTFS_SECRET_KEY=... scripts/aws_full_deploy.sh ssh-env` 显式传入。
+
+如果 RustFS 已在外部 endpoint 上运行，4 台现有机器只需要承担 `3 TiKV + 4 JuiceFS client`：
+
+```bash
+SSH_HOSTS="vm008 vm009 vm010 vm011" \
+TIKV_HOSTS="vm008 vm009 vm010" \
+CONTROL_HOST=vm008 \
+INSTALL_CONTROL_SSH_KEY=0 \
+RUSTFS_ENDPOINT="http://<rustfs-endpoint>:9000" \
+RUSTFS_ACCESS_KEY="<access-key>" \
+RUSTFS_SECRET_KEY="<secret-key>" \
+FORCE=1 \
+scripts/aws_full_deploy.sh ssh-env
+
+scripts/aws_full_deploy.sh bootstrap-existing
+scripts/aws_full_deploy.sh deploy-existing
 ```
 
 如果希望先只生成配置再检查，使用：
@@ -165,6 +208,7 @@ rustfs_instance_type = "m6i.xlarge"
 
 tikv_data_volume_size_gb = 512
 rustfs_data_volume_size_gb = 1024
+tikv_raftstore_capacity = "" # auto: tikv data disk - 128GiB
 data_volume_type = "gp3"
 data_volume_iops = 3000
 data_volume_throughput = 125
@@ -182,6 +226,7 @@ rustfs_instance_type = "m6i.2xlarge"
 
 tikv_data_volume_size_gb = 2048
 rustfs_data_volume_size_gb = 4096
+tikv_raftstore_capacity = "" # auto: tikv data disk - 128GiB
 data_volume_type = "gp3"
 data_volume_iops = 12000
 data_volume_throughput = 500
@@ -229,7 +274,7 @@ set +a
 - `TOPOLOGY`：TiUP topology 文件。
 - `META_URL`：JuiceFS 使用的 TiKV metadata URL。
 - `JFS_BUCKET`：RustFS S3 bucket URL。
-- `SSH_USER` 和 `SSH_KEY`：登录 EC2 的用户和私钥。
+- `SSH_USER` 和 `SSH_KEY`：登录 EC2 的用户和私钥。SSH alias 模式下 `SSH_KEY` 可以由 `ssh-env` 自动生成，也可以留空使用 SSH config。
 
 ## 5. 部署 TiKV 并初始化 JuiceFS
 
@@ -242,9 +287,11 @@ scripts/aws/run_aws_deploy.sh
 这个脚本会执行：
 
 - 等待 4 台机器 cloud-init 完成，并确认 JuiceFS 二进制已安装。
-- 把 TiUP 安装脚本、TiKV 部署脚本、JuiceFS format 脚本、topology 和 SSH key 临时复制到 `CONTROL_HOST`。
+- 把 TiUP 安装脚本、TiKV 部署脚本、JuiceFS format 脚本、topology 和可选 SSH key 临时复制到 `CONTROL_HOST`。
 - 在 VPC 内使用私网 IP 部署 `3 PD + 3 TiKV`。
+- 在控制机和 4 台客户端安装或刷新 JuiceFS 二进制。
 - 使用 RustFS S3 API 初始化 JuiceFS。
+- 在 4 台节点上安装并启动 JuiceFS mount systemd 服务，默认挂载到 `MOUNT_POINT=/mnt/<jfs_name>`。
 - 退出时删除远端临时 key 和 env。
 
 如果只想先等待节点初始化完成，可以单独执行：
@@ -339,12 +386,24 @@ scripts/aws_full_deploy.sh write-test
 常用参数：
 
 ```bash
+FILE_WRITE_TOTAL_FILES=100000000 \
+FILE_WRITE_SIZE_BYTES=1 \
+FILE_WRITE_WORKERS=256 \
+FILES_PER_DIR=100000 \
+scripts/aws_full_deploy.sh write-test
+```
+
+也可以显式指定每台节点写入数量：
+
+```bash
 FILE_WRITE_TARGET_PER_NODE=25000000 \
 FILE_WRITE_SIZE_BYTES=1 \
 FILE_WRITE_WORKERS=256 \
 FILES_PER_DIR=100000 \
 scripts/aws_full_deploy.sh write-test
 ```
+
+优先级为：`FILE_WRITE_TARGET_PER_NODE` 强制单节点数量最高；未设置它时，`FILE_WRITE_TOTAL_FILES` 会按节点数自动平分；两者都未设置时才使用 env 中的 `TARGET_FILES_PER_NODE`。
 
 写入测试目录前缀默认是 `filewrite`；如需自定义，使用 `FILE_WRITE_TEST_PREFIX=my-write-test`。metadata test 可以用 `METADATA_TEST_PREFIX` 或 `TEST_PREFIX` 覆盖目录前缀。
 
@@ -411,7 +470,7 @@ CONFIRM_DESTROY=1 AUTO_APPROVE=0 scripts/aws_full_deploy.sh destroy
 本地生成文件在 `.gitignore` 中已忽略，可按需删除：
 
 ```bash
-rm -rf .terraform terraform.tfstate terraform.tfstate.backup generated/*
+rm -rf terraform/aws/.terraform terraform/aws/terraform.tfstate terraform/aws/terraform.tfstate.backup run/<project>
 ```
 
 ## 10. 排障

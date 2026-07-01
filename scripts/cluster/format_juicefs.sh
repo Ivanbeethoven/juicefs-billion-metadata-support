@@ -14,6 +14,11 @@ for var in $required_vars; do
   fi
 done
 
+if "$JUICEFS" status "$META_URL" >/dev/null 2>&1; then
+  echo "JuiceFS volume already formatted: ${META_URL}"
+  exit 0
+fi
+
 "$JUICEFS" format \
   --storage "$JFS_STORAGE" \
   --bucket "$JFS_BUCKET" \

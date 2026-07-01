@@ -13,14 +13,22 @@ ACTION="${1:-deploy}"
 usage() {
   cat <<'EOF'
 Usage:
-  scripts/aws_full_deploy.sh [provision|deploy|test|write-test|destroy|output]
+  scripts/aws_full_deploy.sh [provision|ssh-env|bootstrap-existing|deploy|deploy-existing|test|write-test|destroy|output]
 
 Actions:
   provision
            Generate terraform.tfvars when missing, run terraform init/apply,
            and wait for EC2 cloud-init bootstrap to finish.
+  ssh-env  Generate run/<project>/juicefs-aws.env and TiUP topology from
+           SSH aliases. Default aliases: aws1 aws2 aws3 aws4.
+  bootstrap-existing
+           Prepare existing SSH hosts: packages, JuiceFS binary, TiKV user
+           and data directories. Does not install RustFS.
   deploy   Generate terraform.tfvars when missing, run terraform init/apply,
-           deploy TiKV inside the VPC, and format JuiceFS.
+           deploy TiKV, format JuiceFS, and install mount services.
+  deploy-existing
+           Reuse an existing env file and deploy TiKV/JuiceFS/mount services,
+           without Terraform.
   test     Load generated env and run distributed JuiceFS metadata test.
   write-test
            Load generated env, write many small files through mounted JuiceFS,
@@ -38,6 +46,7 @@ Common environment overrides:
   FILES_PER_DIR=100000
   TEST_THREADS=256
   DEPLOY_PROFILE=stress
+  SSH_HOSTS="aws1 aws2 aws3 aws4"
   TEST_RUN_ID=20260701-010203
   RESUME_TEST=1
   REPORT_DIR=reports/file-write/20260701-010203
@@ -50,6 +59,8 @@ Safety switches:
   RUN_METADATA_TEST=1 Run metadata test after deploy. Default: 0.
   SKIP_TERRAFORM=1    Reuse existing terraform outputs/env.
   SKIP_DEPLOY=1       Only create/update AWS resources.
+  SKIP_WAIT=1         Do not wait for cloud-init in deploy-existing.
+  SKIP_MOUNT=1        Do not install JuiceFS mount services.
 EOF
 }
 
@@ -138,7 +149,7 @@ terraform_destroy() {
 
 deploy_cluster() {
   load_env
-  log "deploy TiKV cluster and format JuiceFS"
+  log "deploy TiKV cluster, format JuiceFS, and install mount services"
   ENV_FILE="$ENV_FILE" "${SCRIPT_DIR}/run_aws_deploy.sh"
 }
 
@@ -175,6 +186,14 @@ case "$ACTION" in
     wait_cloud_init
     log "machines are ready; TiKV/JuiceFS deployment not started"
     ;;
+  ssh-env)
+    "${SCRIPT_DIR}/generate_ssh_alias_env.sh"
+    ;;
+  bootstrap-existing)
+    load_env
+    log "bootstrap existing SSH hosts"
+    ENV_FILE="$ENV_FILE" "${SCRIPT_DIR}/bootstrap_existing_nodes.sh"
+    ;;
   deploy)
     need_cmd curl
     generate_tfvars_if_needed
@@ -195,6 +214,9 @@ case "$ACTION" in
     else
       log "metadata test skipped; run scripts/aws_full_deploy.sh test when ready"
     fi
+    ;;
+  deploy-existing)
+    deploy_cluster
     ;;
   test)
     run_metadata_test

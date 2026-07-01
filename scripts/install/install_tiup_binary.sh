@@ -4,7 +4,7 @@ set -euo pipefail
 TIDB_VERSION="${TIDB_VERSION:-v8.5.6}"
 TIDB_ARCH="${TIDB_ARCH:-}"
 TIUP_INSTALL_MODE="${TIUP_INSTALL_MODE:-offline}"
-DOWNLOAD_DIR="${DOWNLOAD_DIR:-.downloads}"
+DOWNLOAD_DIR="${DOWNLOAD_DIR:-${TIUP_DOWNLOAD_DIR:-$HOME/.cache/juicefs-deploy/tiup}}"
 PINGCAP_BASE_URL="${PINGCAP_BASE_URL:-https://download.pingcap.com}"
 TIUP_HOME="${TIUP_HOME:-$HOME/.tiup}"
 

@@ -31,6 +31,9 @@ locals {
   target_per_node    = ceil(var.target_total_files / 4)
   key_name           = var.create_key_pair ? aws_key_pair.generated[0].key_name : var.key_name
   run_dir            = abspath("${path.module}/../../run/${var.project_name}")
+
+  tikv_raftstore_capacity_gib = max(var.tikv_data_volume_size_gb - 128, 1)
+  tikv_raftstore_capacity     = var.tikv_raftstore_capacity != "" ? var.tikv_raftstore_capacity : "${local.tikv_raftstore_capacity_gib}GiB"
 }
 
 resource "tls_private_key" "generated" {
@@ -226,8 +229,10 @@ resource "aws_instance" "rustfs" {
 resource "local_file" "tiup_topology" {
   filename = "${local.run_dir}/topology.aws.generated.yaml"
   content = templatefile("${path.module}/templates/topology.yaml.tftpl", {
-    tikv_private_ips = local.tikv_private_ips
-    zones            = local.azs
+    tikv_private_ips           = local.tikv_private_ips
+    zones                      = local.azs
+    tikv_storage_reserve_space = var.tikv_storage_reserve_space
+    tikv_raftstore_capacity    = local.tikv_raftstore_capacity
   })
 }
 

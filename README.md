@@ -43,7 +43,7 @@ scripts/aws_full_deploy.sh provision
 `provision` 会停在“机器已可 SSH、基础软件和 RustFS 节点 bootstrap 完成”的状态，后续再执行完整部署：
 
 ```bash
-SKIP_TERRAFORM=1 scripts/aws_full_deploy.sh deploy
+scripts/aws_full_deploy.sh deploy-existing
 ```
 
 `provision` 完成后，连接配置和生成文件集中在：
@@ -56,6 +56,45 @@ run/slayerfs-rustfs/
 ```
 
 其中 `juicefs-aws.env` 会记录 `SSH_USER`、`SSH_KEY`、`CONTROL_HOST`、`JUICEFS_TEST_HOSTS`、`RUSTFS_ENDPOINT`、`META_URL` 等连接和部署信息。
+
+如果 4 台机器已经在本机 SSH config 中配置成 `aws1`、`aws2`、`aws3`、`aws4`，可以跳过 Terraform 输出，直接生成后续部署需要的 env 和 TiUP topology：
+
+```bash
+scripts/aws_full_deploy.sh ssh-env
+scripts/aws_full_deploy.sh bootstrap-existing
+scripts/aws_full_deploy.sh deploy-existing
+```
+
+默认约定：
+
+- `aws1`、`aws2`、`aws3` 部署 `PD + TiKV`
+- `aws4` 部署/访问 RustFS
+- 脚本会探测 4 台机器的内网 IP，生成 `run/slayerfs-rustfs/juicefs-aws.env`
+- 如果节点上存在 `/data/rustfs1`，TiKV 默认使用 `/data/rustfs1/tikv`，JuiceFS cache 默认使用 `/data/rustfs2/juicefs-cache`
+- 默认会生成 `run/slayerfs-rustfs/ssh-alias-deploy-key`，并把公钥追加到 4 台机器的 `authorized_keys`，让控制机 `aws1` 可以用内网 IP 部署 TiKV
+
+如果 RustFS 密钥无法从 `aws4:/etc/default/rustfs` 读取，需要显式传入：
+
+```bash
+RUSTFS_SECRET_KEY='your-secret' scripts/aws_full_deploy.sh ssh-env
+```
+
+已有外部 RustFS 时，可以只把 4 台 SSH alias 机器作为 3 个 TiKV 节点和 4 个 JuiceFS client。例如：
+
+```bash
+SSH_HOSTS="vm008 vm009 vm010 vm011" \
+TIKV_HOSTS="vm008 vm009 vm010" \
+CONTROL_HOST=vm008 \
+INSTALL_CONTROL_SSH_KEY=0 \
+RUSTFS_ENDPOINT="http://<rustfs-endpoint>:9000" \
+RUSTFS_ACCESS_KEY="<access-key>" \
+RUSTFS_SECRET_KEY="<secret-key>" \
+FORCE=1 \
+scripts/aws_full_deploy.sh ssh-env
+
+scripts/aws_full_deploy.sh bootstrap-existing
+scripts/aws_full_deploy.sh deploy-existing
+```
 
 部署完成后运行 metadata test：
 
@@ -72,7 +111,7 @@ scripts/aws_full_deploy.sh write-test
 报告默认输出到：
 
 ```text
-reports/file-write-<timestamp>/summary.md
+reports/file-write/<run-id>/summary.md
 ```
 
 销毁 AWS 资源需要显式确认：
@@ -115,6 +154,7 @@ tikv_instance_type       = "m6i.xlarge" # 4 vCPU / 16 GiB
 rustfs_instance_type     = "m6i.xlarge" # 4 vCPU / 16 GiB
 tikv_data_volume_size_gb = 512
 rustfs_data_volume_size_gb = 1024
+tikv_raftstore_capacity = "" # auto: tikv data disk - 128GiB
 data_volume_iops        = 3000
 data_volume_throughput  = 125
 target_total_files      = 1000000
@@ -135,6 +175,7 @@ tikv_instance_type       = "m6i.2xlarge" # 8 vCPU / 32 GiB
 rustfs_instance_type     = "m6i.2xlarge" # 8 vCPU / 32 GiB
 tikv_data_volume_size_gb = 2048
 rustfs_data_volume_size_gb = 4096
+tikv_raftstore_capacity = "" # auto: tikv data disk - 128GiB
 data_volume_iops        = 12000
 data_volume_throughput  = 500
 target_total_files      = 100000000
@@ -200,6 +241,8 @@ scripts/aws_full_deploy.sh write-test
 ```bash
 FILE_WRITE_TARGET_PER_NODE=25000000 scripts/aws_full_deploy.sh write-test
 ```
+
+优先级为：`FILE_WRITE_TARGET_PER_NODE` 强制单节点数量最高；未设置它时，`FILE_WRITE_TOTAL_FILES` 会按节点数自动平分；两者都未设置时才使用 env 中的 `TARGET_FILES_PER_NODE`。
 
 写入测试目录前缀默认是 `filewrite`；如果要自定义，用 `FILE_WRITE_TEST_PREFIX=...`。metadata test 可用 `METADATA_TEST_PREFIX=...` 或 `TEST_PREFIX=...`。
 

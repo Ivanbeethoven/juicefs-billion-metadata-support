@@ -6,6 +6,7 @@ JUICEFS_OS="${JUICEFS_OS:-linux}"
 JUICEFS_ARCH="${JUICEFS_ARCH:-}"
 JUICEFS_INSTALL_DIR="${JUICEFS_INSTALL_DIR:-/usr/local/bin}"
 JUICEFS_BASE_URL="${JUICEFS_BASE_URL:-https://github.com/juicedata/juicefs/releases/download/v${JUICEFS_VERSION}}"
+JUICEFS_DOWNLOAD_DIR="${JUICEFS_DOWNLOAD_DIR:-$HOME/.cache/juicefs-deploy/juicefs}"
 
 detect_arch() {
   if [ -n "$JUICEFS_ARCH" ]; then
@@ -23,6 +24,11 @@ detect_arch() {
 download() {
   url="$1"
   output="$2"
+  if [ -f "$output" ]; then
+    echo "using existing ${output}"
+    return
+  fi
+
   if command -v curl >/dev/null 2>&1; then
     curl -fL "$url" -o "$output"
   elif command -v wget >/dev/null 2>&1; then
@@ -49,8 +55,11 @@ pkg="juicefs-${JUICEFS_VERSION}-${JUICEFS_OS}-${arch}.tar.gz"
 workdir="$(mktemp -d)"
 trap 'rm -rf "$workdir"' EXIT
 
-download "${JUICEFS_BASE_URL}/${pkg}" "${workdir}/${pkg}"
-download "${JUICEFS_BASE_URL}/checksums.txt" "${workdir}/checksums.txt"
+mkdir -p "$JUICEFS_DOWNLOAD_DIR"
+download "${JUICEFS_BASE_URL}/${pkg}" "${JUICEFS_DOWNLOAD_DIR}/${pkg}"
+download "${JUICEFS_BASE_URL}/checksums.txt" "${JUICEFS_DOWNLOAD_DIR}/checksums.txt"
+cp "${JUICEFS_DOWNLOAD_DIR}/${pkg}" "${workdir}/${pkg}"
+cp "${JUICEFS_DOWNLOAD_DIR}/checksums.txt" "${workdir}/checksums.txt"
 
 (
   cd "$workdir"
