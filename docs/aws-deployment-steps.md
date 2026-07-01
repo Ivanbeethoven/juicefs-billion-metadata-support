@@ -108,6 +108,12 @@ RUSTFS_INSTANCE_TYPE=i4i.2xlarge \
 scripts/aws/generate_aws_tfvars.sh
 ```
 
+默认 `DEPLOY_PROFILE=dev`，用于低成本部署验证。亿级压测使用：
+
+```bash
+DEPLOY_PROFILE=stress scripts/aws/generate_aws_tfvars.sh
+```
+
 如果文件已存在，脚本默认拒绝覆盖。确认要重建时：
 
 ```bash
@@ -142,7 +148,24 @@ key_name = "my-existing-key"
 ssh_private_key_path = "/absolute/path/to/my-existing-key.pem"
 ```
 
-容量和压测参数按需调整：
+`dev` 档默认配置：
+
+```hcl
+tikv_instance_type = "m6i.xlarge"
+rustfs_instance_type = "m6i.xlarge"
+
+tikv_data_volume_size_gb = 512
+rustfs_data_volume_size_gb = 1024
+data_volume_type = "gp3"
+data_volume_iops = 3000
+data_volume_throughput = 125
+
+target_total_files = 1000000
+files_per_dir = 10000
+test_threads = 64
+```
+
+亿级压测档 `DEPLOY_PROFILE=stress` 会生成：
 
 ```hcl
 tikv_instance_type = "m6i.2xlarge"

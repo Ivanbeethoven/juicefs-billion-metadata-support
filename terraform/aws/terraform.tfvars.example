@@ -13,14 +13,14 @@ create_key_pair = true
 # key_name = "my-existing-key"
 # ssh_private_key_path = "/absolute/path/to/my-existing-key.pem"
 
-tikv_instance_type = "m6i.2xlarge"
-rustfs_instance_type = "m6i.2xlarge"
+tikv_instance_type = "m6i.xlarge"
+rustfs_instance_type = "m6i.xlarge"
 
-tikv_data_volume_size_gb = 2048
-rustfs_data_volume_size_gb = 4096
+tikv_data_volume_size_gb = 512
+rustfs_data_volume_size_gb = 1024
 data_volume_type = "gp3"
-data_volume_iops = 12000
-data_volume_throughput = 500
+data_volume_iops = 3000
+data_volume_throughput = 125
 
 juicefs_version = "1.3.1"
 tidb_version = "v8.5.6"
@@ -30,7 +30,7 @@ rustfs_secret_key = "replace-with-strong-secret"
 rustfs_bucket = "juicefs-prod"
 jfs_name = "juicefs-prod"
 
-# Distributed mdtest target. 100,000,000 total files means ~25M per node.
-target_total_files = 100000000
-files_per_dir = 100000
-test_threads = 256
+# Distributed mdtest target. 1,000,000 total files means ~250K per node.
+target_total_files = 1000000
+files_per_dir = 10000
+test_threads = 64

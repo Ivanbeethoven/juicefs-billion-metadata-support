@@ -67,13 +67,13 @@ variable "ssh_user" {
 variable "tikv_instance_type" {
   description = "Instance type for PD+TiKV nodes."
   type        = string
-  default     = "m6i.2xlarge"
+  default     = "m6i.xlarge"
 }
 
 variable "rustfs_instance_type" {
   description = "Instance type for the RustFS node."
   type        = string
-  default     = "m6i.2xlarge"
+  default     = "m6i.xlarge"
 }
 
 variable "root_volume_size_gb" {
@@ -85,13 +85,13 @@ variable "root_volume_size_gb" {
 variable "tikv_data_volume_size_gb" {
   description = "TiKV data EBS volume size per node."
   type        = number
-  default     = 2048
+  default     = 512
 }
 
 variable "rustfs_data_volume_size_gb" {
   description = "RustFS data EBS volume size."
   type        = number
-  default     = 4096
+  default     = 1024
 }
 
 variable "data_volume_type" {
@@ -103,13 +103,13 @@ variable "data_volume_type" {
 variable "data_volume_iops" {
   description = "EBS gp3 IOPS for data volumes."
   type        = number
-  default     = 12000
+  default     = 3000
 }
 
 variable "data_volume_throughput" {
   description = "EBS gp3 throughput MB/s for data volumes."
   type        = number
-  default     = 500
+  default     = 125
 }
 
 variable "juicefs_version" {
@@ -180,19 +180,19 @@ variable "jfs_name" {
 variable "target_total_files" {
   description = "Total small-file target for distributed metadata benchmark."
   type        = number
-  default     = 100000000
+  default     = 1000000
 }
 
 variable "files_per_dir" {
   description = "Files per directory for mdtest."
   type        = number
-  default     = 100000
+  default     = 10000
 }
 
 variable "test_threads" {
   description = "mdtest threads per node."
   type        = number
-  default     = 256
+  default     = 64
 }
 
 variable "common_tags" {

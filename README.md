@@ -12,7 +12,7 @@ JuiceFS metadata -> TiKV
 JuiceFS objects  -> RustFS S3 API
 ```
 
-默认压测目标是亿级小文件：`100,000,000` 个文件分散到 4 台 JuiceFS client 并发执行。部署完成后可以运行 metadata test，也可以通过挂载点真实写入大量小文件并生成测试报告。
+默认配置偏省钱验证：`m6i.xlarge`、gp3 默认性能、百万级小文件目标。需要亿级小文件压测时，使用 `DEPLOY_PROFILE=stress` 切到高配档。
 
 完整步骤和架构图见 [AWS deployment steps](docs/aws-deployment-steps.md)。
 
@@ -95,12 +95,40 @@ RUSTFS_INSTANCE_TYPE=i4i.2xlarge \
 scripts/aws_full_deploy.sh deploy
 ```
 
-默认压测参数：
+## Deployment Profiles
+
+默认 `DEPLOY_PROFILE=dev`，用于先跑通部署和百万级小文件验证：
 
 ```hcl
-target_total_files = 100000000
-files_per_dir      = 100000
-test_threads       = 256
+tikv_instance_type       = "m6i.xlarge" # 4 vCPU / 16 GiB
+rustfs_instance_type     = "m6i.xlarge" # 4 vCPU / 16 GiB
+tikv_data_volume_size_gb = 512
+rustfs_data_volume_size_gb = 1024
+data_volume_iops        = 3000
+data_volume_throughput  = 125
+target_total_files      = 1000000
+files_per_dir           = 10000
+test_threads            = 64
+```
+
+亿级压测使用 `DEPLOY_PROFILE=stress`：
+
+```bash
+DEPLOY_PROFILE=stress scripts/aws_full_deploy.sh deploy
+```
+
+`stress` 档会生成：
+
+```hcl
+tikv_instance_type       = "m6i.2xlarge" # 8 vCPU / 32 GiB
+rustfs_instance_type     = "m6i.2xlarge" # 8 vCPU / 32 GiB
+tikv_data_volume_size_gb = 2048
+rustfs_data_volume_size_gb = 4096
+data_volume_iops        = 12000
+data_volume_throughput  = 500
+target_total_files      = 100000000
+files_per_dir           = 100000
+test_threads            = 256
 ```
 
 ## Test File Counts
@@ -117,7 +145,7 @@ TARGET_TOTAL_FILES=100000000 scripts/aws_full_deploy.sh test
 TARGET_FILES_PER_NODE=25000000 scripts/aws_full_deploy.sh test
 ```
 
-Terraform 生成的默认值是 `target_total_files = 100000000`，4 台节点时会生成 `TARGET_FILES_PER_NODE=25000000`。由于 `mdtest` 要按目录树取整，实际创建文件数可能略高于目标值。
+`dev` 档默认 `target_total_files = 1000000`；`stress` 档默认 `target_total_files = 100000000`，4 台节点时会生成 `TARGET_FILES_PER_NODE=25000000`。由于 `mdtest` 要按目录树取整，实际创建文件数可能略高于目标值。
 
 真实写入测试通过 JuiceFS 挂载点创建小文件，并生成 Markdown 报告：
 
