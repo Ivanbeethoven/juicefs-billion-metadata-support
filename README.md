@@ -158,6 +158,32 @@ TARGET_FILES_PER_NODE=25000000 scripts/aws_full_deploy.sh test
 
 `dev` 档默认 `target_total_files = 1000000`；`stress` 档默认 `target_total_files = 100000000`，4 台节点时会生成 `TARGET_FILES_PER_NODE=25000000`。由于 `mdtest` 要按目录树取整，实际创建文件数可能略高于目标值。
 
+两类测试都会生成聚合报告：
+
+```text
+reports/
+  metadata/<run-id>/
+    summary.md
+    summary.kv
+    hosts.tsv
+    nodes/<host>/result.kv
+    nodes/<host>/stdout.log
+    nodes/<host>/stderr.log
+    nodes/<host>/pre-node-info.log
+    nodes/<host>/post-node-info.log
+  file-write/<run-id>/
+    summary.md
+    summary.kv
+    hosts.tsv
+    nodes/<host>/result.kv
+    nodes/<host>/stdout.log
+    nodes/<host>/stderr.log
+    nodes/<host>/pre-node-info.log
+    nodes/<host>/post-node-info.log
+```
+
+`summary.md` 会聚合所有 JuiceFS 客户端的吞吐；`summary.kv` 适合脚本读取；每个 `nodes/<host>/` 目录保留远端 stdout/stderr、节点状态、`juicefs status`、`df`、进程和磁盘采样。默认也会采集 `iostat`，机器没有 `sysstat` 时会自动跳过。
+
 真实写入测试通过 JuiceFS 挂载点创建小文件，并生成 Markdown 报告：
 
 ```bash
@@ -173,6 +199,24 @@ scripts/aws_full_deploy.sh write-test
 
 ```bash
 FILE_WRITE_TARGET_PER_NODE=25000000 scripts/aws_full_deploy.sh write-test
+```
+
+写入测试目录前缀默认是 `filewrite`；如果要自定义，用 `FILE_WRITE_TEST_PREFIX=...`。metadata test 可用 `METADATA_TEST_PREFIX=...` 或 `TEST_PREFIX=...`。
+
+如果测试中断，可以用同一个 `TEST_RUN_ID` 继续。metadata test 会跳过已成功的客户端，失败客户端会换 retry 目录重跑；file-write 会复用同名测试目录，跳过已存在且大小正确的文件，只补写缺失部分：
+
+```bash
+TEST_RUN_ID=20260701-010203 RESUME_TEST=1 scripts/aws_full_deploy.sh test
+TEST_RUN_ID=20260701-010203 RESUME_TEST=1 scripts/aws_full_deploy.sh write-test
+```
+
+如果要复用已有报告目录，也可以显式指定：
+
+```bash
+REPORT_DIR=reports/file-write/20260701-010203 \
+TEST_RUN_ID=20260701-010203 \
+RESUME_TEST=1 \
+scripts/aws_full_deploy.sh write-test
 ```
 
 先小规模试跑可以这样：

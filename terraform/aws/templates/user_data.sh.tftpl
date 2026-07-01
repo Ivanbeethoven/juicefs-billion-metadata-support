@@ -15,7 +15,7 @@ hostnamectl set-hostname "$HOSTNAME_VALUE"
 
 export DEBIAN_FRONTEND=noninteractive
 apt-get update
-apt-get install -y ca-certificates curl wget tar gzip unzip xfsprogs jq fuse3 fio python3
+apt-get install -y ca-certificates curl wget tar gzip unzip xfsprogs jq fuse3 fio python3 sysstat
 
 swapoff -a || true
 sed -i.bak '/[[:space:]]swap[[:space:]]/ s/^/#/' /etc/fstab || true

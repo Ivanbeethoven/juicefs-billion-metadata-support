@@ -38,6 +38,10 @@ Common environment overrides:
   FILES_PER_DIR=100000
   TEST_THREADS=256
   DEPLOY_PROFILE=stress
+  TEST_RUN_ID=20260701-010203
+  RESUME_TEST=1
+  REPORT_DIR=reports/file-write/20260701-010203
+  COLLECT_NODE_INFO=1
 
 Safety switches:
   AUTO_APPROVE=0      Prompt during terraform apply/destroy. Default: 1.

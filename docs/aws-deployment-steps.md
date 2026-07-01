@@ -261,6 +261,22 @@ scripts/aws/wait_aws_nodes.sh
 scripts/aws_full_deploy.sh test
 ```
 
+默认会生成本地报告目录：
+
+```text
+reports/metadata/<run-id>/
+  summary.md
+  summary.kv
+  hosts.tsv
+  nodes/<host>/result.kv
+  nodes/<host>/stdout.log
+  nodes/<host>/stderr.log
+  nodes/<host>/pre-node-info.log
+  nodes/<host>/post-node-info.log
+```
+
+其中 `summary.md` 聚合多个 JuiceFS 客户端的估算文件数、单节点耗时和整体 files/s；`summary.kv` 方便后续脚本读取。每个节点目录保存远端 stdout/stderr、执行结果 KV、测试前后的系统状态、`juicefs status`、`df`、进程列表和可用时的 `iostat`。
+
 也可以直接调用底层脚本：
 
 ```bash
@@ -294,6 +310,15 @@ scripts/test/run_metadata_test_all_nodes.sh
 EXTRA_MDTEST_ARGS="--rand" scripts/test/run_metadata_test_all_nodes.sh
 ```
 
+如果中途有节点失败，保留同一个 `TEST_RUN_ID` 后续跑即可。已经成功并有 `result.kv` 的节点会被跳过；失败节点会用新的 per-node retry 目录重跑，避免 mdtest 受残留目录影响：
+
+```bash
+TEST_RUN_ID=20260701-010203 \
+REPORT_DIR=reports/metadata/20260701-010203 \
+RESUME_TEST=1 \
+scripts/aws_full_deploy.sh test
+```
+
 ## 7. 运行小文件写入测试并生成报告
 
 metadata test 更偏元数据路径；如果要通过已挂载的 JuiceFS 尽可能写入大量真实小文件，运行：
@@ -307,8 +332,9 @@ scripts/aws_full_deploy.sh write-test
 - 读取 `run/<project>/juicefs-aws.env`。
 - 并发登录 `JUICEFS_TEST_HOSTS` 中的 4 台节点。
 - 在每台节点的 `MOUNT_POINT` 下创建多 worker 小文件写入任务。
-- 收集每台节点的 `files_written`、`bytes_written`、`elapsed_seconds`、`files_per_second` 和错误数。
-- 在本地生成 Markdown 报告，默认路径为 `reports/file-write-<timestamp>/summary.md`。
+- 收集每台节点的 `files_created`、`files_skipped`、`files_present`、`bytes_created`、`elapsed_seconds`、`files_per_second`、`mb_per_second` 和错误数。
+- 在本地生成 Markdown 报告，默认路径为 `reports/file-write/<run-id>/summary.md`。
+- 在 `reports/file-write/<run-id>/nodes/<host>/` 下保存远端 stdout/stderr、结果 KV、测试前后节点状态和可用时的 `iostat`。
 
 常用参数：
 
@@ -320,6 +346,8 @@ FILES_PER_DIR=100000 \
 scripts/aws_full_deploy.sh write-test
 ```
 
+写入测试目录前缀默认是 `filewrite`；如需自定义，使用 `FILE_WRITE_TEST_PREFIX=my-write-test`。metadata test 可以用 `METADATA_TEST_PREFIX` 或 `TEST_PREFIX` 覆盖目录前缀。
+
 如果希望按时间尽量写入，而不是固定文件数，可以设置最大运行秒数：
 
 ```bash
@@ -330,6 +358,22 @@ scripts/aws_full_deploy.sh write-test
 ```
 
 每次测试会在挂载点下创建形如 `filewrite-<host>-<timestamp>` 的目录。报告会记录每台机器的具体测试目录，清理前先确认不再需要这些文件。
+
+如果写入测试中断，使用相同 `TEST_RUN_ID` 和 `RESUME_TEST=1` 继续。脚本会复用同名测试目录，跳过已经存在且大小等于 `FILE_WRITE_SIZE_BYTES` 的文件，只补写缺失文件：
+
+```bash
+TEST_RUN_ID=20260701-010203 \
+REPORT_DIR=reports/file-write/20260701-010203 \
+RESUME_TEST=1 \
+FILE_WRITE_TARGET_PER_NODE=25000000 \
+scripts/aws_full_deploy.sh write-test
+```
+
+续跑报告里：
+
+- `Created` 表示本次新写入文件数。
+- `Reused` 表示续跑时识别到的已存在文件数。
+- `Present` 表示该节点目录内本轮目标范围内最终具备的文件数。
 
 ## 8. 常用检查
 
