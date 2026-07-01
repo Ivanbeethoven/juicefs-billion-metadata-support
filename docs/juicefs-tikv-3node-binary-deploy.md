@@ -35,7 +35,7 @@ cd ../..
 
 ```bash
 set -a
-. terraform/aws/generated/juicefs-aws.env
+. run/slayerfs-rustfs/juicefs-aws.env
 set +a
 ```
 

@@ -46,6 +46,17 @@ scripts/aws_full_deploy.sh provision
 SKIP_TERRAFORM=1 scripts/aws_full_deploy.sh deploy
 ```
 
+`provision` 完成后，连接配置和生成文件集中在：
+
+```text
+run/slayerfs-rustfs/
+  juicefs-aws.env
+  slayerfs-rustfs.pem
+  topology.aws.generated.yaml
+```
+
+其中 `juicefs-aws.env` 会记录 `SSH_USER`、`SSH_KEY`、`CONTROL_HOST`、`JUICEFS_TEST_HOSTS`、`RUSTFS_ENDPOINT`、`META_URL` 等连接和部署信息。
+
 部署完成后运行 metadata test：
 
 ```bash
@@ -211,9 +222,9 @@ tiup/
 
 Terraform 会生成：
 
-- `tiup/topology.aws.generated.yaml`
-- `terraform/aws/generated/juicefs-aws.env`
-- `terraform/aws/generated/<project>.pem`，当 `create_key_pair=true`
+- `run/<project>/topology.aws.generated.yaml`
+- `run/<project>/juicefs-aws.env`
+- `run/<project>/<project>.pem`，当 `create_key_pair=true`
 
 这些文件以及 Terraform state、报告目录、私钥、下载包都已加入 `.gitignore`。
 

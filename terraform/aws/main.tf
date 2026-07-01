@@ -30,6 +30,7 @@ locals {
   juicefs_bucket_url = "${local.rustfs_endpoint}/${var.rustfs_bucket}"
   target_per_node    = ceil(var.target_total_files / 4)
   key_name           = var.create_key_pair ? aws_key_pair.generated[0].key_name : var.key_name
+  run_dir            = abspath("${path.module}/../../run/${var.project_name}")
 }
 
 resource "tls_private_key" "generated" {
@@ -46,7 +47,7 @@ resource "aws_key_pair" "generated" {
 
 resource "local_sensitive_file" "private_key" {
   count           = var.create_key_pair ? 1 : 0
-  filename        = "${path.module}/generated/${var.project_name}.pem"
+  filename        = "${local.run_dir}/${var.project_name}.pem"
   content         = tls_private_key.generated[0].private_key_openssh
   file_permission = "0600"
 }
@@ -223,7 +224,7 @@ resource "aws_instance" "rustfs" {
 }
 
 resource "local_file" "tiup_topology" {
-  filename = "${path.module}/../../tiup/topology.aws.generated.yaml"
+  filename = "${local.run_dir}/topology.aws.generated.yaml"
   content = templatefile("${path.module}/templates/topology.yaml.tftpl", {
     tikv_private_ips = local.tikv_private_ips
     zones            = local.azs
@@ -231,13 +232,13 @@ resource "local_file" "tiup_topology" {
 }
 
 resource "local_sensitive_file" "env" {
-  filename        = "${path.module}/generated/juicefs-aws.env"
+  filename        = "${local.run_dir}/juicefs-aws.env"
   file_permission = "0600"
   content = templatefile("${path.module}/templates/env.tftpl", {
     tidb_version          = var.tidb_version
     tidb_arch             = var.tidb_arch
     cluster_name          = var.project_name
-    topology              = "tiup/topology.aws.generated.yaml"
+    topology              = abspath(local_file.tiup_topology.filename)
     ssh_user              = var.ssh_user
     ssh_key               = var.create_key_pair ? abspath(local_sensitive_file.private_key[0].filename) : var.ssh_private_key_path
     pd_endpoint           = "http://${local.tikv_private_ips[0]}:2379"

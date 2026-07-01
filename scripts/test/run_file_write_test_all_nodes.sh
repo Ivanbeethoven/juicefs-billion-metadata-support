@@ -3,7 +3,8 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
-ENV_FILE="${ENV_FILE:-${REPO_ROOT}/terraform/aws/generated/juicefs-aws.env}"
+RUN_DIR="${RUN_DIR:-${REPO_ROOT}/run/${PROJECT_NAME:-slayerfs-rustfs}}"
+ENV_FILE="${ENV_FILE:-${RUN_DIR}/juicefs-aws.env}"
 
 if [ -f "$ENV_FILE" ]; then
   set -a

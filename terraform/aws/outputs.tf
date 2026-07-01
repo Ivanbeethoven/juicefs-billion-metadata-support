@@ -38,6 +38,10 @@ output "generated_topology_file" {
   value = abspath(local_file.tiup_topology.filename)
 }
 
+output "run_dir" {
+  value = local.run_dir
+}
+
 output "private_key_file" {
   value     = var.create_key_pair ? abspath(local_sensitive_file.private_key[0].filename) : null
   sensitive = true
@@ -45,7 +49,7 @@ output "private_key_file" {
 
 output "next_steps" {
   value = [
-    "source terraform/aws/generated/juicefs-aws.env",
+    "source run/${var.project_name}/juicefs-aws.env",
     "scripts/aws/run_aws_deploy.sh",
     "scripts/test/run_metadata_test_all_nodes.sh",
   ]

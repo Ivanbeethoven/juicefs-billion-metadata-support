@@ -73,6 +73,15 @@ scripts/aws_full_deploy.sh deploy
 scripts/aws_full_deploy.sh provision
 ```
 
+`provision` 完成后，连接配置和私钥集中在 `run/<project>/`：
+
+```text
+run/slayerfs-rustfs/
+  juicefs-aws.env
+  slayerfs-rustfs.pem
+  topology.aws.generated.yaml
+```
+
 机器准备好后再继续部署：
 
 ```bash
@@ -134,7 +143,7 @@ rustfs_bucket = "juicefs-prod"
 jfs_name = "juicefs-prod"
 ```
 
-默认会创建新的 EC2 key pair，并把私钥写入 `terraform/aws/generated/<project>.pem`：
+默认会创建新的 EC2 key pair，并把私钥写入 `run/<project>/<project>.pem`：
 
 ```hcl
 create_key_pair = true
@@ -193,9 +202,9 @@ terraform -chdir=terraform/aws apply
 
 Terraform 会生成这些部署文件：
 
-- `terraform/aws/generated/juicefs-aws.env`
-- `tiup/topology.aws.generated.yaml`
-- `terraform/aws/generated/<project>.pem`，仅当 `create_key_pair=true`
+- `run/<project>/juicefs-aws.env`
+- `run/<project>/topology.aws.generated.yaml`
+- `run/<project>/<project>.pem`，仅当 `create_key_pair=true`
 
 可以用 Terraform output 核对地址：
 
@@ -209,7 +218,7 @@ terraform -chdir=terraform/aws output
 
 ```bash
 set -a
-. terraform/aws/generated/juicefs-aws.env
+. run/slayerfs-rustfs/juicefs-aws.env
 set +a
 ```
 
@@ -258,7 +267,7 @@ scripts/aws_full_deploy.sh test
 scripts/test/run_metadata_test_all_nodes.sh
 ```
 
-默认参数来自 `terraform/aws/generated/juicefs-aws.env`：
+默认参数来自 `run/<project>/juicefs-aws.env`：
 
 ```bash
 TARGET_FILES_PER_NODE=25000000
@@ -295,7 +304,7 @@ scripts/aws_full_deploy.sh write-test
 
 这个命令会：
 
-- 读取 `terraform/aws/generated/juicefs-aws.env`。
+- 读取 `run/<project>/juicefs-aws.env`。
 - 并发登录 `JUICEFS_TEST_HOSTS` 中的 4 台节点。
 - 在每台节点的 `MOUNT_POINT` 下创建多 worker 小文件写入任务。
 - 收集每台节点的 `files_written`、`bytes_written`、`elapsed_seconds`、`files_per_second` 和错误数。
