@@ -6,11 +6,35 @@ REPO_ROOT="$(cd "${SCRIPT_DIR}/../.." && pwd)"
 RUN_DIR="${RUN_DIR:-${REPO_ROOT}/run/${PROJECT_NAME:-slayerfs-rustfs}}"
 ENV_FILE="${ENV_FILE:-${RUN_DIR}/juicefs-aws.env}"
 
+override_vars=(
+  JUICEFS_TEST_HOSTS SSH_USER SSH_KEY REMOTE_SCRIPT REMOTE_REPORT_ROOT
+  FILE_WRITE_TEST_PREFIX TEST_PREFIX MOUNT_POINT FILE_WRITE_TOTAL_FILES
+  TARGET_FILES_PER_NODE FILE_WRITE_TARGET_PER_NODE FILE_WRITE_SIZE_BYTES
+  WRITE_SIZE FILES_PER_DIR FILE_WRITE_WORKERS THREADS FILE_WRITE_MAX_SECONDS
+  FILE_WRITE_SYNC_EVERY REPORT_ROOT TEST_RUN_ID REPORT_DIR RESUME_TEST
+  COLLECT_NODE_INFO DRY_RUN
+)
+for var in "${override_vars[@]}"; do
+  if [ "${!var+x}" ]; then
+    printf -v "__override_${var}" '%s' "${!var}"
+    printf -v "__override_set_${var}" '1'
+  fi
+done
+
 if [ -f "$ENV_FILE" ]; then
   set -a
   . "$ENV_FILE"
   set +a
 fi
+
+for var in "${override_vars[@]}"; do
+  set_var="__override_set_${var}"
+  if [ "${!set_var:-}" = "1" ]; then
+    value_var="__override_${var}"
+    printf -v "$var" '%s' "${!value_var}"
+    export "$var"
+  fi
+done
 
 # shellcheck source=scripts/test/lib_report.sh
 . "${SCRIPT_DIR}/lib_report.sh"
@@ -65,6 +89,7 @@ echo "  hosts: ${host_count}"
 echo "  target total files: ${FILE_WRITE_TOTAL_FILES:-auto}"
 echo "  target files per node: ${TARGET_FILES_PER_NODE}"
 echo "  file size bytes: ${FILE_SIZE_BYTES}"
+echo "  files per directory: ${FILES_PER_DIR}"
 echo "  workers per node: ${WORKERS}"
 echo "  report dir: ${REPORT_DIR}"
 echo "  resume: ${RESUME_TEST}"

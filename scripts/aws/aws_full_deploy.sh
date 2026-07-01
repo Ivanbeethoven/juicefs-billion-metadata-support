@@ -90,9 +90,33 @@ tfvars_args() {
 
 load_env() {
   [ -f "$ENV_FILE" ] || die "generated env not found: ${ENV_FILE}"
+  override_vars=(
+    TARGET_TOTAL_FILES TARGET_FILES_PER_NODE FILES_PER_DIR THREADS TEST_THREADS
+    WRITE_SIZE DEPTH MDTEST_DIRS EXTRA_MDTEST_ARGS TEST_RUN_ID REPORT_ROOT
+    REPORT_DIR RESUME_TEST COLLECT_NODE_INFO DRY_RUN METADATA_TEST_PREFIX
+    FILE_WRITE_TEST_PREFIX FILE_WRITE_TOTAL_FILES FILE_WRITE_TARGET_PER_NODE
+    FILE_WRITE_SIZE_BYTES FILE_WRITE_WORKERS FILE_WRITE_MAX_SECONDS
+    FILE_WRITE_SYNC_EVERY TEST_PREFIX MOUNT_POINT
+  )
+  for var in "${override_vars[@]}"; do
+    if [ "${!var+x}" ]; then
+      printf -v "__override_${var}" '%s' "${!var}"
+      printf -v "__override_set_${var}" '1'
+    fi
+  done
+
   set -a
   . "$ENV_FILE"
   set +a
+
+  for var in "${override_vars[@]}"; do
+    set_var="__override_set_${var}"
+    if [ "${!set_var:-}" = "1" ]; then
+      value_var="__override_${var}"
+      printf -v "$var" '%s' "${!value_var}"
+      export "$var"
+    fi
+  done
 }
 
 generate_tfvars_if_needed() {
