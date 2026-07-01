@@ -13,7 +13,7 @@ ACTION="${1:-deploy}"
 usage() {
   cat <<'EOF'
 Usage:
-  scripts/aws_full_deploy.sh [provision|ssh-env|bootstrap-existing|deploy|deploy-existing|test|write-test|destroy|output]
+  scripts/aws_full_deploy.sh [provision|ssh-env|bootstrap-existing|deploy|deploy-existing|test|write-test|write-progress|collect-write-results|destroy|output]
 
 Actions:
   provision
@@ -33,6 +33,12 @@ Actions:
   write-test
            Load generated env, write many small files through mounted JuiceFS,
            and generate a Markdown report under reports/.
+  write-progress
+           Check a running file write test: remote pids, stderr tails, df,
+           optional exact file count, and optional RustFS backend disk usage.
+  collect-write-results
+           Pull completed remote file write results and generate a local
+           summary report. Safe to run while jobs are still pending.
   destroy  Destroy AWS resources with terraform destroy.
   output   Show terraform outputs.
 
@@ -51,6 +57,9 @@ Common environment overrides:
   RESUME_TEST=1
   REPORT_DIR=reports/file-write/20260701-010203
   COLLECT_NODE_INFO=1
+  EXACT_COUNT=1
+  RUSTFS_BACKEND_HOSTS="vm001 vm002 vm003"
+  RUSTFS_BACKEND_JUMP_TARGET=juicefs-bastion
 
 Safety switches:
   AUTO_APPROVE=0      Prompt during terraform apply/destroy. Default: 1.
@@ -195,6 +204,18 @@ run_file_write_test() {
   "${REPO_ROOT}/scripts/test/run_file_write_test_all_nodes.sh"
 }
 
+run_file_write_progress() {
+  load_env
+  log "check distributed file write progress"
+  "${REPO_ROOT}/scripts/test/check_file_write_progress.sh"
+}
+
+collect_file_write_results() {
+  load_env
+  log "collect distributed file write results"
+  "${REPO_ROOT}/scripts/test/collect_file_write_results.sh"
+}
+
 case "$ACTION" in
   -h|--help|help)
     usage
@@ -247,6 +268,12 @@ case "$ACTION" in
     ;;
   write-test)
     run_file_write_test
+    ;;
+  write-progress)
+    run_file_write_progress
+    ;;
+  collect-write-results)
+    collect_file_write_results
     ;;
   destroy)
     terraform_destroy

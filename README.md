@@ -108,6 +108,26 @@ scripts/aws_full_deploy.sh test
 scripts/aws_full_deploy.sh write-test
 ```
 
+查看正在运行的小文件写入测试进度：
+
+```bash
+TEST_RUN_ID=20260701-010203 scripts/aws_full_deploy.sh write-progress
+```
+
+精确统计当前批次已写入文件数时加 `EXACT_COUNT=1`。它会扫描 JuiceFS 元数据，长压测期间建议 10-30 分钟看一次，不要高频轮询：
+
+```bash
+TEST_RUN_ID=20260701-010203 \
+EXACT_COUNT=1 \
+scripts/aws_full_deploy.sh write-progress
+```
+
+测试完成后拉回远端结果并重建本地汇总：
+
+```bash
+TEST_RUN_ID=20260701-010203 scripts/aws_full_deploy.sh collect-write-results
+```
+
 报告默认输出到：
 
 ```text
@@ -282,6 +302,35 @@ JUICEFS_TEST_HOSTS="host1 host2 host3 host4" \
 FILE_WRITE_TOTAL_FILES=100000000 \
 DRY_RUN=1 \
 scripts/test/run_file_write_test_all_nodes.sh
+```
+
+查看正在运行的 file-write 进度：
+
+```bash
+TEST_RUN_ID=20260701-010203 scripts/aws_full_deploy.sh write-progress
+```
+
+`write-progress` 会检查每个 JuiceFS 客户端上的远端 pid、进程状态、stderr 尾部、挂载点和 cache 目录容量。如果需要精确统计当前批次文件数，设置 `EXACT_COUNT=1`：
+
+```bash
+TEST_RUN_ID=20260701-010203 \
+EXACT_COUNT=1 \
+scripts/aws_full_deploy.sh write-progress
+```
+
+精确统计会执行 `find` 扫描 JuiceFS 目录，会额外压 metadata；长压测期间建议 10-30 分钟看一次即可。后端 RustFS 磁盘也可以一起采集：
+
+```bash
+TEST_RUN_ID=20260701-010203 \
+RUSTFS_BACKEND_HOSTS="vm001 vm002 vm003" \
+RUSTFS_BACKEND_JUMP_TARGET=juicefs-bastion \
+scripts/aws_full_deploy.sh write-progress
+```
+
+远端 detached 运行或本地会话断开后，完成时用下面命令拉回结果并重建 `summary.md` / `summary.kv`：
+
+```bash
+TEST_RUN_ID=20260701-010203 scripts/aws_full_deploy.sh collect-write-results
 ```
 
 ## Repository Layout

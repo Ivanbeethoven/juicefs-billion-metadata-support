@@ -434,6 +434,39 @@ scripts/aws_full_deploy.sh write-test
 - `Reused` 表示续跑时识别到的已存在文件数。
 - `Present` 表示该节点目录内本轮目标范围内最终具备的文件数。
 
+### 查看运行中进度
+
+常规进度检查只看远端 pid、进程状态、stderr 尾部、JuiceFS 挂载点容量和 cache 目录容量：
+
+```bash
+TEST_RUN_ID=20260701-010203 scripts/aws_full_deploy.sh write-progress
+```
+
+如果要精确统计当前批次已经写入多少文件，开启 `EXACT_COUNT=1`：
+
+```bash
+TEST_RUN_ID=20260701-010203 \
+EXACT_COUNT=1 \
+scripts/aws_full_deploy.sh write-progress
+```
+
+精确统计会对 JuiceFS 目录执行 `find`，会额外消耗 metadata 能力。长时间压测时建议 10-30 分钟看一次，不要高频轮询。
+
+RustFS 后端磁盘也可以一起采集。如果后端节点只能从跳板机登录，使用 `RUSTFS_BACKEND_JUMP_TARGET`：
+
+```bash
+TEST_RUN_ID=20260701-010203 \
+RUSTFS_BACKEND_HOSTS="vm001 vm002 vm003" \
+RUSTFS_BACKEND_JUMP_TARGET=juicefs-bastion \
+scripts/aws_full_deploy.sh write-progress
+```
+
+远端 detached 运行或本地会话断开后，测试完成时拉回结果并重建本地报告：
+
+```bash
+TEST_RUN_ID=20260701-010203 scripts/aws_full_deploy.sh collect-write-results
+```
+
 ## 8. 常用检查
 
 在控制机查看 TiKV 集群：
