@@ -88,7 +88,7 @@ scripts/aws/generate_aws_tfvars.sh
 
 ```bash
 AWS_REGION=us-west-2 \
-PROJECT_NAME=juicefs-prod \
+PROJECT_NAME=slayerfs-rustfs \
 ALLOWED_SSH_CIDRS="203.0.113.10/32" \
 TIKV_INSTANCE_TYPE=i4i.2xlarge \
 RUSTFS_INSTANCE_TYPE=i4i.2xlarge \

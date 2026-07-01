@@ -1,11 +1,11 @@
 aws_region = "us-east-1"
-project_name = "juicefs-3tikv"
+project_name = "slayerfs-rustfs"
 
 # Replace with your office/VPN public CIDR.
 allowed_ssh_cidrs = ["203.0.113.10/32"]
 expose_rustfs_console = false
 
-# Defaults create an EC2 key pair and write generated/juicefs-3tikv.pem.
+# Defaults create an EC2 key pair and write generated/slayerfs-rustfs.pem.
 create_key_pair = true
 
 # For existing key pair:

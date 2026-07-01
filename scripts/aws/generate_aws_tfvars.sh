@@ -73,7 +73,7 @@ fi
 mkdir -p "$(dirname "$OUT_FILE")"
 
 AWS_REGION="${AWS_REGION:-us-east-1}"
-PROJECT_NAME="${PROJECT_NAME:-juicefs-3tikv}"
+PROJECT_NAME="${PROJECT_NAME:-slayerfs-rustfs}"
 DEPLOY_PROFILE="${DEPLOY_PROFILE:-dev}"
 ALLOWED_SSH_CIDRS_VALUE="$(detect_public_cidr)"
 EXPOSE_RUSTFS_CONSOLE="${EXPOSE_RUSTFS_CONSOLE:-false}"

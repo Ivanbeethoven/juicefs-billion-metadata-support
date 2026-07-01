@@ -101,7 +101,7 @@ vi terraform/aws/terraform.tfvars
 
 ```bash
 AWS_REGION=us-west-2 \
-PROJECT_NAME=juicefs-prod \
+PROJECT_NAME=slayerfs-rustfs \
 ALLOWED_SSH_CIDRS="203.0.113.10/32,198.51.100.20/32" \
 TIKV_INSTANCE_TYPE=i4i.2xlarge \
 RUSTFS_INSTANCE_TYPE=i4i.2xlarge \
@@ -124,7 +124,7 @@ FORCE=1 scripts/aws/generate_aws_tfvars.sh
 
 ```hcl
 aws_region = "us-east-1"
-project_name = "juicefs-3tikv"
+project_name = "slayerfs-rustfs"
 
 allowed_ssh_cidrs = ["自动探测到的公网出口/32"]
 expose_rustfs_console = false

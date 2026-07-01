@@ -7,7 +7,7 @@ variable "aws_region" {
 variable "project_name" {
   description = "Name prefix for AWS resources."
   type        = string
-  default     = "juicefs-3tikv"
+  default     = "slayerfs-rustfs"
 }
 
 variable "vpc_cidr" {
